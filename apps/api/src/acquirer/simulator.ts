@@ -79,8 +79,6 @@ type SimulatorConfig = Pick<
  * call, at zero extra RAM/CPU cost — a meaningful saving under the 0.5 vCPU
  * / 512 MB budget for the whole platform.
  */
-// the idempotency maps never get cleared, slow leak? — am
-// MK: cleared on restart and we deploy daily. not a leak
 export function createAcquirerSimulator(config: SimulatorConfig): AcquirerSimulator {
   const random = config.acquirerRngSeed !== null ? seededRandomSource(config.acquirerRngSeed) : cryptoRandomSource();
 
@@ -93,6 +91,15 @@ export function createAcquirerSimulator(config: SimulatorConfig): AcquirerSimula
   const authorizeCache = new Map<string, AcquirerAuthorizeResult>();
   const captureCache = new Map<string, AcquirerCaptureResult>();
   const refundCache = new Map<string, AcquirerRefundResult>();
+  const cacheLimit = 10_000;
+
+  function remember<V>(cache: Map<string, V>, key: string, value: V): void {
+    if (cache.size >= cacheLimit && !cache.has(key)) {
+      const oldest = cache.keys().next().value;
+      if (oldest !== undefined) cache.delete(oldest);
+    }
+    cache.set(key, value);
+  }
 
   async function applyLatency(): Promise<number> {
     const ms = random.int(config.acquirerLatencyMinMs, config.acquirerLatencyMaxMs);
@@ -133,7 +140,7 @@ export function createAcquirerSimulator(config: SimulatorConfig): AcquirerSimula
         ...(rolled.declineReason !== undefined ? { declineReason: rolled.declineReason } : {}),
         latencyMs,
       };
-      authorizeCache.set(req.idempotencyKey, result);
+      remember(authorizeCache, req.idempotencyKey, result);
       return result;
     },
 
@@ -149,7 +156,7 @@ export function createAcquirerSimulator(config: SimulatorConfig): AcquirerSimula
         acquirerReference: req.acquirerReference,
         latencyMs,
       };
-      captureCache.set(req.idempotencyKey, result);
+      remember(captureCache, req.idempotencyKey, result);
       return result;
     },
 
@@ -165,7 +172,7 @@ export function createAcquirerSimulator(config: SimulatorConfig): AcquirerSimula
         acquirerReference: req.acquirerReference,
         latencyMs,
       };
-      refundCache.set(req.idempotencyKey, result);
+      remember(refundCache, req.idempotencyKey, result);
       return result;
     },
   };

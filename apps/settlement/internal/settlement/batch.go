@@ -449,6 +449,19 @@ func PayoutBatch(ctx context.Context, db *pgxpool.Pool, batchID uuid.UUID) (Payo
 		return PayoutResult{}, fmt.Errorf("settlement: PayoutBatch: apply balance cache delta: %w", err)
 	}
 
+	if netPayout > 0 {
+		_, err = tx.Exec(ctx, `
+			INSERT INTO settlement_payout_disbursements (settlement_batch_id, amount_fils, disbursement_reference)
+			SELECT $1, $2, 'disb_' || gen_random_uuid()
+			 WHERE NOT EXISTS (
+			   SELECT 1 FROM settlement_payout_disbursements WHERE settlement_batch_id = $1
+			 )
+		`, batchID, netPayout)
+		if err != nil {
+			return PayoutResult{}, fmt.Errorf("settlement: PayoutBatch: record disbursement: %w", err)
+		}
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return PayoutResult{}, fmt.Errorf("settlement: PayoutBatch: commit: %w", err)
 	}

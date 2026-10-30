@@ -11,8 +11,11 @@ export async function recordPayoutDisbursementEffect(
     return;
   }
 
-  // One instruction per batch. This runs on a webhook delivery's first attempt, and a batch has one delivery per
-  // subscribed endpoint plus any replays, so an unguarded INSERT disbursed the same payout once for each of them.
+  // PayoutBatch writes this row in the same transaction as the ledger legs.
+  // This call is the backfill for deliveries of batches paid before that
+  // change, and for any path that still notifies without going through Go.
+  // One instruction per batch: unguarded INSERT used to fire once per
+  // subscribed endpoint plus replays.
   await pool.query(
     `INSERT INTO settlement_payout_disbursements (settlement_batch_id, amount_fils, disbursement_reference)
      SELECT $1, $2, 'disb_' || gen_random_uuid()

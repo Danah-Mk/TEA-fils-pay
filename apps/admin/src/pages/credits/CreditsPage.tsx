@@ -1,17 +1,31 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { formatBhd, toFils } from "@filspay/money";
+import { formatBhd, parseBhdToFils, toFils } from "@filspay/money";
 import {
   approveCreditRequest,
+  issueCredit,
   listCreditRequests,
   rejectCreditRequest,
 } from "../../api/credits.js";
+import { listMerchants } from "../../api/merchants.js";
 import { describeError } from "../../api/client.js";
 import { RequireRole } from "../../auth/RequireRole.js";
-import type { CreditRequestDto, CreditRequestStatus } from "../../types.js";
+import type {
+  AdminMerchantSummary,
+  CreditReasonCode,
+  CreditRequestDto,
+  CreditRequestStatus,
+} from "../../types.js";
 
 function bhd(fils: number): string {
   return `${formatBhd(toFils(fils, { allowNegative: true }))} BHD`;
+}
+
+function todayIso(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+    now.getDate(),
+  ).padStart(2, "0")}`;
 }
 
 const STATUS_TABS: Array<{ value: CreditRequestStatus; label: string }> = [
@@ -28,8 +42,6 @@ const STATUS_TABS: Array<{ value: CreditRequestStatus; label: string }> = [
  * isn't shown a control that would answer 403 — the gate itself lives on the
  * route, server-side.
  */
-// approve is gated server side but issuing (MerchantDetail) only in the ui? — am
-// MK: both are server-side
 export function CreditsPage() {
   const [status, setStatus] = useState<CreditRequestStatus>("pending_approval");
   const [items, setItems] = useState<CreditRequestDto[]>([]);
@@ -40,6 +52,15 @@ export function CreditsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [pendingReject, setPendingReject] = useState<string | null>(null);
+
+  const [merchants, setMerchants] = useState<AdminMerchantSummary[]>([]);
+  const [issueMerchantId, setIssueMerchantId] = useState("");
+  const [creditAmountBhd, setCreditAmountBhd] = useState("");
+  const [creditReason, setCreditReason] = useState<CreditReasonCode>("goodwill");
+  const [creditMemo, setCreditMemo] = useState("");
+  const [creditReverseFee, setCreditReverseFee] = useState(false);
+  const [creditEffectiveDate, setCreditEffectiveDate] = useState(todayIso());
+  const [issueBusy, setIssueBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -56,6 +77,18 @@ export function CreditsPage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    void listMerchants({ onboardingStatus: ["approved"], limit: 50 })
+      .then((page) => {
+        const rows = page.merchants ?? [];
+        setMerchants(rows);
+        setIssueMerchantId((current) => current || rows[0]?.id || "");
+      })
+      .catch(() => {
+        /* list still works without the dropdown if merchants fail to load */
+      });
+  }, []);
+
   async function loadMore(): Promise<void> {
     if (!nextCursor) return;
     try {
@@ -64,6 +97,44 @@ export function CreditsPage() {
       setNextCursor(page.nextCursor);
     } catch (err) {
       setLoadError(describeError(err));
+    }
+  }
+
+  async function handleIssueCredit(event: React.FormEvent): Promise<void> {
+    event.preventDefault();
+    if (!issueMerchantId) {
+      setActionError("Pick a merchant.");
+      return;
+    }
+    setIssueBusy(true);
+    setActionError(null);
+    setNotice(null);
+    try {
+      const baseAmountFils = parseBhdToFils(creditAmountBhd);
+      const record = await issueCredit(issueMerchantId, {
+        baseAmountFils,
+        reasonCode: creditReason,
+        effectiveDate: creditEffectiveDate,
+        reverseFee: creditReverseFee,
+        memo: creditMemo.trim() ? creditMemo.trim() : undefined,
+      });
+      setNotice(
+        record.status === "posted"
+          ? `Credit of ${bhd(record.postedAmountFils)} posted to the ledger.`
+          : `Credit of ${bhd(record.postedAmountFils)} raised. Approve it below as a different finance admin (not the one who created it).`,
+      );
+      setCreditAmountBhd("");
+      setCreditMemo("");
+      setCreditReverseFee(false);
+      if (status === "pending_approval") {
+        await load();
+      } else {
+        setStatus("pending_approval");
+      }
+    } catch (err) {
+      setActionError(err instanceof RangeError ? err.message : describeError(err));
+    } finally {
+      setIssueBusy(false);
     }
   }
 
@@ -111,6 +182,78 @@ export function CreditsPage() {
         A credit above the approval limit cannot post until a second <code>finance</code> or{" "}
         <code>super_admin</code> operator — not the one who raised it — approves it.
       </p>
+
+      <h2>Create credit</h2>
+      <RequireRole
+        allow={["finance", "super_admin"]}
+        fallback={
+          <p className="admin-muted">Your role cannot issue credits. Ask a finance admin.</p>
+        }
+      >
+        <form className="admin-form" onSubmit={(e) => void handleIssueCredit(e)}>
+          <label>
+            Merchant
+            <select
+              required
+              value={issueMerchantId}
+              onChange={(e) => setIssueMerchantId(e.target.value)}
+            >
+              {merchants.length === 0 ? <option value="">Loading merchants…</option> : null}
+              {merchants.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.displayName}
+                  {m.testMode ? " (test)" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Amount (BD, up to 3 decimals)
+            <input
+              type="text"
+              required
+              placeholder="50.000"
+              value={creditAmountBhd}
+              onChange={(e) => setCreditAmountBhd(e.target.value)}
+            />
+          </label>
+          <label>
+            Reason
+            <select
+              value={creditReason}
+              onChange={(e) => setCreditReason(e.target.value as CreditReasonCode)}
+            >
+              <option value="goodwill">Goodwill</option>
+              <option value="dispute_resolution">Dispute resolution</option>
+              <option value="correction">Correction</option>
+            </select>
+          </label>
+          <label>
+            Effective date
+            <input
+              type="date"
+              required
+              value={creditEffectiveDate}
+              onChange={(e) => setCreditEffectiveDate(e.target.value)}
+            />
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={creditReverseFee}
+              onChange={(e) => setCreditReverseFee(e.target.checked)}
+            />{" "}
+            Also reverse the MDR on this amount
+          </label>
+          <label>
+            Memo (optional)
+            <textarea value={creditMemo} onChange={(e) => setCreditMemo(e.target.value)} rows={2} />
+          </label>
+          <button type="submit" disabled={issueBusy || !issueMerchantId}>
+            {issueBusy ? "Submitting..." : "Create credit"}
+          </button>
+        </form>
+      </RequireRole>
 
       <nav className="admin-nav">
         {STATUS_TABS.map((tab) => (

@@ -26,6 +26,12 @@ func RebuildMerchantBalance(ctx context.Context, db *pgxpool.Pool, merchantID uu
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck
 
+	// Exclusive lock so a concurrent CloseBatch increment cannot land
+	// between the SUM and the cache overwrite.
+	if _, err := tx.Exec(ctx, `LOCK TABLE merchant_balances IN EXCLUSIVE MODE`); err != nil {
+		return 0, fmt.Errorf("ledger: RebuildMerchantBalance(%s): lock merchant_balances: %w", merchantID, err)
+	}
+
 	var balance int64
 	err = tx.QueryRow(ctx, `
 		SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount_fils ELSE -amount_fils END), 0)
@@ -108,7 +114,12 @@ func RebuildAllBalances(ctx context.Context, db *pgxpool.Pool) (map[uuid.UUID]Re
 	}
 	rows.Close()
 
-	// TODO: lock merchant_balances rows first, a concurrent CloseBatch increment gets clobbered -- YA
+	// Exclusive lock: CloseBatch/PayoutBatch write merchant_balances; without
+	// this a concurrent increment is overwritten by the SUM we are about to store.
+	if _, err := tx.Exec(ctx, `LOCK TABLE merchant_balances IN EXCLUSIVE MODE`); err != nil {
+		return nil, fmt.Errorf("ledger: RebuildAllBalances: lock merchant_balances: %w", err)
+	}
+
 	diffs := make(map[uuid.UUID]RebuildDiff, len(merchantIDs))
 
 	for _, merchantID := range merchantIDs {
