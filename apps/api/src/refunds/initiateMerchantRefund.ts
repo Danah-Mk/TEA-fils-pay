@@ -6,11 +6,9 @@ import { processRefund, type ProcessRefundResult } from "../payments/processRefu
 import { ForbiddenError, NotFoundError } from "../lib/errors.js";
 
 /**
- * `POST /v1/merchants/:merchantId/refunds` business logic.
- *
- * Merchant-scoped path, refund target in the body — the same registration
- * shape `routes/paymentLinks.ts` and `routes/webhooks.ts` use under the
- * `/v1/merchants` prefix.
+ * `POST /v1/refunds` business logic. The merchant always comes from the
+ * authenticated session or API key (routes/refunds.ts), never from the path
+ * or body; the refund target (`transactionId`) is in the body.
  */
 
 /**
@@ -59,9 +57,12 @@ export async function initiateMerchantRefund(
 ): Promise<ProcessRefundResult> {
   await assertRefundsNotOnHold(pool, input.merchantId);
 
+  // Scoped to the caller's own merchant: another merchant's transaction id
+  // must answer exactly like a missing one (404), never be refunded on the
+  // caller's behalf.
   const result = await pool.query<{ id: string; merchant_id: string }>(
-    `SELECT id, merchant_id FROM transactions WHERE id = $1`,
-    [input.transactionId],
+    `SELECT id, merchant_id FROM transactions WHERE id = $1 AND merchant_id = $2`,
+    [input.transactionId, input.merchantId],
   );
   const txn = result.rows[0];
   if (!txn) {

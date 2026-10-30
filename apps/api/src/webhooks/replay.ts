@@ -46,7 +46,7 @@ export async function insertReplayDeliveryRow(
   // MK: new id per replay on purpose, receivers dedupe on the original id in the body
   // FH: ARCH §5 says Webhook-Delivery-Id is stable across retries and replays — this mints a new one?
   const newDeliveryEventId = randomUUID();
-  const replayPayload = { ...original.payload, id: newDeliveryEventId };
+  const replayPayload = { ...original.payload };
 
   const insertResult = await client.query<{ id: string; status: string }>(
     `INSERT INTO webhook_deliveries

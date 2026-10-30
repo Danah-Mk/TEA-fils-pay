@@ -10,6 +10,10 @@ export interface SettlementBatchDto {
   status: string;
   grossFils: number;
   feeFils: number;
+  /** Gross returned to cardholders by the refunds this batch absorbed (FP-212). */
+  refundFils: number;
+  /** MDR given back to the merchant on those refunds. */
+  refundFeeReversedFils: number;
   netPayoutFils: number;
   closedAt: string | null;
   paidAt: string | null;
@@ -22,6 +26,8 @@ interface SettlementBatchRow {
   status: string;
   gross_fils: string | number;
   fee_fils: string | number;
+  refund_fils: string | number;
+  refund_fee_reversed_fils: string | number;
   net_payout_fils: string | number;
   closed_at: Date | null;
   paid_at: Date | null;
@@ -49,7 +55,9 @@ function toBatchDateString(d: Date): string {
 
 /**
  * Maps a settlement_batches row to its DTO. Invariant (enforced by the Go
- * worker at close): netPayoutFils === grossFils - feeFils for every batch.
+ * worker at close): netPayoutFils === grossFils - feeFils - refundFils +
+ * refundFeeReversedFils for every batch (the refund terms are 0 for a batch
+ * that absorbed no refunds, and for every batch closed before FP-212).
  */
 function serializeBatch(row: SettlementBatchRow): SettlementBatchDto {
   return {
@@ -58,6 +66,8 @@ function serializeBatch(row: SettlementBatchRow): SettlementBatchDto {
     status: row.status,
     grossFils: Number(row.gross_fils),
     feeFils: Number(row.fee_fils),
+    refundFils: Number(row.refund_fils),
+    refundFeeReversedFils: Number(row.refund_fee_reversed_fils),
     netPayoutFils: Number(row.net_payout_fils),
     closedAt: row.closed_at ? row.closed_at.toISOString() : null,
     paidAt: row.paid_at ? row.paid_at.toISOString() : null,
@@ -100,7 +110,9 @@ function decodeCursor(cursor: string | null | undefined): DecodedCursor | null {
 }
 
 function encodeCursor(batchDate: Date, id: string): string {
-  return Buffer.from(`${toBatchDateString(batchDate)}|${id}`, "utf8").toString("base64url");
+  return Buffer.from(`${toBatchDateString(batchDate)}|${id}`, "utf8").toString(
+    "base64url",
+  );
 }
 
 /**
@@ -112,12 +124,17 @@ export async function listSettlementBatches(
   pool: Pool,
   filters: ListSettlementBatchesFilters,
 ): Promise<ListSettlementBatchesResult> {
-  const limit = Math.min(MAX_LIMIT, Math.max(1, filters.limit ?? DEFAULT_LIMIT));
-  const statusArray = filters.status && filters.status.length > 0 ? filters.status : null;
+  const limit = Math.min(
+    MAX_LIMIT,
+    Math.max(1, filters.limit ?? DEFAULT_LIMIT),
+  );
+  const statusArray =
+    filters.status && filters.status.length > 0 ? filters.status : null;
   const decodedCursor = decodeCursor(filters.cursor);
 
   const result = await pool.query<SettlementBatchRow>(
-    `SELECT id, batch_date, status, gross_fils, fee_fils, net_payout_fils, closed_at, paid_at
+    `SELECT id, batch_date, status, gross_fils, fee_fils, refund_fils, refund_fee_reversed_fils,
+            net_payout_fils, closed_at, paid_at
        FROM settlement_batches
       WHERE merchant_id = $1
         AND ($2::date IS NULL OR batch_date >= $2)
@@ -139,7 +156,10 @@ export async function listSettlementBatches(
 
   const batches = result.rows.map(serializeBatch);
   const lastRow = result.rows[result.rows.length - 1];
-  const nextCursor = result.rows.length === limit && lastRow ? encodeCursor(lastRow.batch_date, lastRow.id) : null;
+  const nextCursor =
+    result.rows.length === limit && lastRow
+      ? encodeCursor(lastRow.batch_date, lastRow.id)
+      : null;
 
   return { batches, nextCursor };
 }
@@ -154,6 +174,8 @@ export interface SettlementBatchDetailDto extends SettlementBatchDto {
    *  within the batch window contributes one scheme_export_lines row but
    *  two transaction_events rows. */
   includedEventCount: number;
+  /** Count of refunds this batch absorbed. */
+  includedRefundCount: number;
 }
 
 /**
@@ -166,26 +188,35 @@ export async function getSettlementBatch(
   input: { merchantId: string; batchId: string },
 ): Promise<SettlementBatchDetailDto | null> {
   const batchResult = await pool.query<SettlementBatchRow>(
-    `SELECT id, batch_date, status, gross_fils, fee_fils, net_payout_fils, closed_at, paid_at
+    `SELECT id, batch_date, status, gross_fils, fee_fils, refund_fils, refund_fee_reversed_fils,
+            net_payout_fils, closed_at, paid_at
        FROM settlement_batches WHERE id = $1 AND merchant_id = $2`,
     [input.batchId, input.merchantId],
   );
   const row = batchResult.rows[0];
   if (!row) return null;
 
-  const [txnCountResult, eventCountResult] = await Promise.all([
-    pool.query<{ count: string }>(`SELECT count(*) FROM scheme_export_lines WHERE settlement_batch_id = $1`, [
-      input.batchId,
-    ]),
-    pool.query<{ count: string }>(`SELECT count(*) FROM transaction_events WHERE settlement_batch_id = $1`, [
-      input.batchId,
-    ]),
-  ]);
+  const [txnCountResult, eventCountResult, refundCountResult] =
+    await Promise.all([
+      pool.query<{ count: string }>(
+        `SELECT count(*) FROM scheme_export_lines WHERE settlement_batch_id = $1`,
+        [input.batchId],
+      ),
+      pool.query<{ count: string }>(
+        `SELECT count(*) FROM transaction_events WHERE settlement_batch_id = $1`,
+        [input.batchId],
+      ),
+      pool.query<{ count: string }>(
+        `SELECT count(*) FROM refunds WHERE settlement_batch_id = $1`,
+        [input.batchId],
+      ),
+    ]);
 
   return {
     ...serializeBatch(row),
     includedTransactionCount: Number(txnCountResult.rows[0]?.count ?? 0),
     includedEventCount: Number(eventCountResult.rows[0]?.count ?? 0),
+    includedRefundCount: Number(refundCountResult.rows[0]?.count ?? 0),
   };
 }
 
@@ -248,8 +279,17 @@ export async function listBatchTransactions(
 
 /**
  * gapFils = ledgerMerchantPayableNetFils - settlementNetPayoutFils -
- * pendingUnbatchedFils. Refund legs are included both in the ledger figure
- * and in pending, so a period with refunds still explains to zero.
+ * pendingUnbatchedFils.
+ *
+ * Refunds: the ledger books a refund's legs the moment it happens, but the
+ * batch that takes it out of the payout may close in a different period (or
+ * not yet). pendingUnbatchedFils therefore also carries refunds:
+ *   - minus the net (gross - fee reversed) of refunds made in the period that
+ *     no batch dated inside the period has absorbed (not batched yet, or
+ *     carried to a later batch);
+ *   - plus the net of refunds made before the period that a batch dated
+ *     inside it absorbed.
+ * so a period with refunds still explains to zero.
  */
 export interface ReconciliationReport {
   periodFrom: string;
@@ -285,7 +325,14 @@ export async function getReconciliationReport(
   const windowStart = bahrainLocalMidnightUtc(input.from);
   const windowEnd = bahrainLocalMidnightUtc(input.to);
 
-  const [ledgerResult, settlementResult, pendingResult, merchantResult] = await Promise.all([
+  const [
+    ledgerResult,
+    settlementResult,
+    pendingResult,
+    merchantResult,
+    refundsOutResult,
+    refundsInResult,
+  ] = await Promise.all([
     pool.query<{ net: string }>(
       `SELECT COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount_fils ELSE -amount_fils END), 0) AS net
          FROM ledger_entries
@@ -313,6 +360,28 @@ export async function getReconciliationReport(
       `SELECT mdr_bps, negotiated_discount_bps FROM merchants WHERE id = $1`,
       [input.merchantId],
     ),
+    // Refunds made in the period that no batch dated inside the period has absorbed
+    // (not batched yet, or carried to a batch dated after the period).
+    pool.query<{ net: string }>(
+      `SELECT COALESCE(SUM(r.amount_fils - r.fee_reversed_fils), 0) AS net
+         FROM refunds r
+         LEFT JOIN settlement_batches b ON b.id = r.settlement_batch_id
+        WHERE r.merchant_id = $1 AND r.status = 'succeeded'
+          AND r.occurred_at >= $2 AND r.occurred_at < $3
+          AND (r.settlement_batch_id IS NULL OR NOT (b.batch_date >= $4 AND b.batch_date < $5))`,
+      [input.merchantId, windowStart, windowEnd, input.from, input.to],
+    ),
+    // Refunds made before the period that a batch dated inside the period absorbed.
+    pool.query<{ net: string }>(
+      `SELECT COALESCE(SUM(r.amount_fils - r.fee_reversed_fils), 0) AS net
+         FROM refunds r
+         JOIN settlement_batches b ON b.id = r.settlement_batch_id
+        WHERE r.merchant_id = $1 AND r.status = 'succeeded'
+          AND r.occurred_at < $2
+          AND b.status IN ('closed', 'paid')
+          AND b.batch_date >= $3 AND b.batch_date < $4`,
+      [input.merchantId, windowStart, input.from, input.to],
+    ),
   ]);
 
   // MK: merchants.mdr_bps is kept in sync with the current fee_schedules row by the 0046 trigger,
@@ -327,10 +396,17 @@ export async function getReconciliationReport(
     const feeFils = estimateFeeFils(amountFils, mdrBps, discountBps);
     pendingUnbatchedFils += amountFils - feeFils;
   }
+  // Refund legs are already in the ledger figure; the batch that takes them out of the payout
+  // may sit in another period, so carry the difference here (see the doc comment above).
+  pendingUnbatchedFils -= Number(refundsOutResult.rows[0]?.net ?? 0);
+  pendingUnbatchedFils += Number(refundsInResult.rows[0]?.net ?? 0);
 
   const ledgerMerchantPayableNetFils = Number(ledgerResult.rows[0]?.net ?? 0);
   const settlementNetPayoutFils = Number(settlementResult.rows[0]?.total ?? 0);
-  const gapFils = ledgerMerchantPayableNetFils - settlementNetPayoutFils - pendingUnbatchedFils;
+  const gapFils =
+    ledgerMerchantPayableNetFils -
+    settlementNetPayoutFils -
+    pendingUnbatchedFils;
 
   return {
     periodFrom: input.from,
@@ -365,7 +441,7 @@ export async function getSettlementSummary(
 
   const result = await pool.query<SettlementSummaryRow>(
     `WITH captured AS (
-       SELECT t.id, t.captured_fils
+       SELECT t.id, te.amount_fils
          FROM transactions t
          JOIN transaction_events te ON te.transaction_id = t.id
         WHERE t.merchant_id = $1
@@ -373,7 +449,7 @@ export async function getSettlementSummary(
           AND te.occurred_at >= $2 AND te.occurred_at < $3
      )
      SELECT COUNT(DISTINCT id) AS transaction_count,
-            COALESCE(SUM(captured_fils), 0) AS total_captured_fils
+            COALESCE(SUM(amount_fils), 0) AS total_captured_fils
        FROM captured`,
     [input.merchantId, windowStart, windowEnd],
   );

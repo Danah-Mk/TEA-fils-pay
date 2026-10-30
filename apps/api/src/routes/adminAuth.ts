@@ -123,39 +123,36 @@ export async function adminAuthRoutes(app: FastifyInstance): Promise<void> {
       throw new UnauthorizedError("no_pending_session");
     }
 
-    const challengeResult = await app.db.query<{
+    const claimed = await app.db.query<{
       id: string;
       code_salt: string;
       code_hash: string;
-      attempt_count: number;
-      max_attempts: number;
-      expires_at: Date;
-      consumed_at: Date | null;
     }>(
-      `SELECT id, code_salt, code_hash, attempt_count, max_attempts, expires_at, consumed_at
-         FROM admin_otp_challenges WHERE id = $1`,
+      `UPDATE admin_otp_challenges
+          SET attempt_count = attempt_count + 1
+        WHERE id = $1
+          AND consumed_at IS NULL
+          AND expires_at > now()
+          AND attempt_count < max_attempts
+        RETURNING id, code_salt, code_hash`,
       [pending.otpChallengeId],
     );
-    const challenge = challengeResult.rows[0];
-    if (!challenge || challenge.consumed_at !== null) {
+    const challenge = claimed.rows[0];
+    if (!challenge) {
+      const existing = await app.db.query<{ attempt_count: number; max_attempts: number }>(
+        `SELECT attempt_count, max_attempts FROM admin_otp_challenges WHERE id = $1`,
+        [pending.otpChallengeId],
+      );
+      const row = existing.rows[0];
+      if (row && row.attempt_count >= row.max_attempts) {
+        await revokeAdminSession(app.db, pending.adminSessionId);
+        throw new TooManyRequestsError("too_many_attempts");
+      }
       throw new GoneError("otp_expired");
-    }
-    if (challenge.expires_at.getTime() <= Date.now()) {
-      throw new GoneError("otp_expired");
-    }
-
-    // admin path doesn't have the merchant race, the challenge row is read FOR UPDATE — MK
-    if (challenge.attempt_count >= challenge.max_attempts) {
-      await revokeAdminSession(app.db, pending.adminSessionId);
-      throw new TooManyRequestsError("too_many_attempts");
     }
 
     const matches = verifyOtpCode(code, challenge.code_salt, challenge.code_hash);
     if (!matches) {
-      await app.db.query(
-        `UPDATE admin_otp_challenges SET attempt_count = attempt_count + 1 WHERE id = $1`,
-        [challenge.id],
-      );
       throw new UnauthorizedError("invalid_code");
     }
 

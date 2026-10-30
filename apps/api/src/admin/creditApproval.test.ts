@@ -26,3 +26,28 @@ test("two different operators satisfy two-person control", () => {
     ),
   );
 });
+
+test("the same admin cannot self-approve under two display names", () => {
+  const adminUserId = randomUUID();
+  assert.throws(
+    () =>
+      assertDistinctApprover(
+        { adminUserId, displayName: "Dana Finance" },
+        { adminUserId, displayName: "Dana (treasury)" },
+      ),
+    (err: unknown) => {
+      assert.ok(err instanceof AppError);
+      assert.equal(err.code, "self_approval_forbidden");
+      return true;
+    },
+  );
+});
+
+test("two admins who share a display name are still distinct", () => {
+  assert.doesNotThrow(() =>
+    assertDistinctApprover(
+      { adminUserId: randomUUID(), displayName: "Dana Finance" },
+      { adminUserId: randomUUID(), displayName: "Dana Finance" },
+    ),
+  );
+});

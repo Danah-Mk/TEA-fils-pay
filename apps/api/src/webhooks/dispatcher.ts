@@ -3,6 +3,7 @@ import { Client, type Pool } from "pg";
 import type { Config } from "../config.js";
 import { withTransaction } from "../db/withTransaction.js";
 import { decodeEncryptionKey, decryptSecret } from "./secretCrypto.js";
+import { canonicalJson } from "../payments/idempotency.js";
 import { signPayload } from "./sign.js";
 import { buildEnvelope } from "./envelope.js";
 import { recordPayoutDisbursementEffect } from "./payoutDisbursement.js";
@@ -22,12 +23,13 @@ import type { WebhookTransport } from "./transport.js";
 
 const STEP_A_BATCH_LIMIT = 500;
 const STEP_B_BATCH_LIMIT = 100;
-// add refund.succeeded here when refunds ship, thats all it needs — am
 // YA: adding a type here without a buildEnvelope case throws in Step A and stalls the whole queue. envelope.ts first.
+// (refund.succeeded has its buildEnvelope case in envelope.ts - FP-212.)
 // MK: settlement.batch_closed taken out of this list in Feb (too noisy). docs still mention it
 const WEBHOOK_ELIGIBLE_EVENT_TYPES: readonly string[] = [
   "transaction.captured",
   "transaction.voided",
+  "refund.succeeded",
   "settlement.paid",
 ];
 const NOTIFY_CHANNEL = "outbox_events_channel";
@@ -50,15 +52,25 @@ export type DispatcherConfig = Pick<
   | "webhookSecretEncryptionKey"
 >;
 
-/** Exponential backoff with a cap and ±10 % jitter. attemptNumber is the
- *  attempt that just failed (1-indexed). */
+/** Exponential backoff with a cap. attemptNumber is the attempt that just
+ *  failed (1-indexed). Jitter is applied at the write site so this formula
+ *  stays deterministic for tests. */
 export function backoffDelayMs(
+  attemptNumber: number,
+  config: Pick<Config, "webhookBackoffBaseMs" | "webhookBackoffCapMs">,
+): number {
+  const raw = config.webhookBackoffBaseMs * 2 ** (attemptNumber - 1);
+  return Math.min(raw, config.webhookBackoffCapMs);
+}
+
+/** ±10 % jitter around the deterministic backoff, so retries across
+ *  endpoints do not thundering-herd. */
+function jitteredBackoffDelayMs(
   attemptNumber: number,
   config: Pick<Config, "webhookBackoffBaseMs" | "webhookBackoffCapMs">,
   jitter: () => number = Math.random,
 ): number {
-  const raw = config.webhookBackoffBaseMs * 2 ** (attemptNumber - 1);
-  const capped = Math.min(raw, config.webhookBackoffCapMs);
+  const capped = backoffDelayMs(attemptNumber, config);
   return Math.round(capped * (0.9 + jitter() * 0.2));
 }
 
@@ -92,7 +104,16 @@ async function createMissingDeliveries(pool: Pool): Promise<number> {
               we.id AS endpoint_id
          FROM outbox_events oe
          JOIN webhook_endpoints we
-           ON we.merchant_id = (oe.payload->>'merchantId')::uuid
+           ON we.merchant_id = (
+                COALESCE(
+                  oe.payload->>'merchantId',
+                  CASE
+                    WHEN jsonb_typeof(oe.payload) = 'string'
+                    THEN ((oe.payload #>> '{}')::jsonb)->>'merchantId'
+                    ELSE NULL
+                  END
+                )
+              )::uuid
           AND we.status = 'active'
           AND oe.created_at >= we.created_at
         WHERE oe.event_type = ANY($1::text[])
@@ -169,7 +190,9 @@ async function attemptOneDelivery(
       [WEBHOOK_DELIVERY_ID_HEADER]: row.delivery_event_id,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(row.payload),
+    // Send exactly the bytes that were signed: signPayload hashes canonicalJson(payload) (sorted keys), while a plain
+    // JSON.stringify of the jsonb payload has a different key order, so verifying over the received body failed.
+    body: canonicalJson(row.payload),
     timeoutMs: config.webhookRequestTimeoutMs,
   });
 
@@ -202,7 +225,7 @@ async function attemptOneDelivery(
     return;
   }
 
-  const delayMs = backoffDelayMs(newAttemptCount, config);
+  const delayMs = jitteredBackoffDelayMs(newAttemptCount, config);
   await pool.query(
     `UPDATE webhook_deliveries
         SET attempt_count = attempt_count + 1, signature = $2,
@@ -218,12 +241,22 @@ async function attemptOneDelivery(
 // FH: staging ran 2 replicas since June, never saw a dup delivery, so it's fine
 async function attemptDueDeliveries(pool: Pool, transport: WebhookTransport, config: DispatcherConfig): Promise<number> {
   const dueResult = await pool.query<DueDeliveryRow>(
-    `SELECT wd.id, wd.endpoint_id, wd.event_type, wd.delivery_event_id, wd.payload, wd.attempt_count, we.url, we.secret_ciphertext
-       FROM webhook_deliveries wd
-       JOIN webhook_endpoints we ON we.id = wd.endpoint_id
-      WHERE wd.status = 'pending' AND wd.next_attempt_at <= now()
-      ORDER BY wd.next_attempt_at ASC
-      LIMIT $1`,
+    `WITH due AS (
+       SELECT wd.id
+         FROM webhook_deliveries wd
+         JOIN webhook_endpoints we ON we.id = wd.endpoint_id
+        WHERE wd.status = 'pending'
+          AND wd.next_attempt_at <= now()
+          AND we.status = 'active'
+        ORDER BY wd.next_attempt_at ASC
+        LIMIT $1
+        FOR UPDATE OF wd SKIP LOCKED
+     )
+     UPDATE webhook_deliveries wd
+        SET next_attempt_at = now() + interval '5 minutes'
+       FROM due, webhook_endpoints we
+      WHERE wd.id = due.id AND we.id = wd.endpoint_id
+     RETURNING wd.id, wd.endpoint_id, wd.event_type, wd.delivery_event_id, wd.payload, wd.attempt_count, we.url, we.secret_ciphertext`,
     [STEP_B_BATCH_LIMIT],
   );
 

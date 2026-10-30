@@ -61,14 +61,14 @@ already exists:
 
 | Piece | Where | State |
 |---|---|---|
-| Route | `POST /v1/refunds` (`apps/api/src/routes/refunds.ts`) | stub, returns `501` |
-| Core helper | `apps/api/src/payments/processRefund.ts` | complete, tested |
-| Validation / status | `refundValidation.ts`, `refundState.ts` | complete, tested |
+| Route | `POST /v1/refunds` (`apps/api/src/routes/refunds.ts`) | live |
+| Core helper | `apps/api/src/payments/processRefund.ts` | locked, merchant-scoped |
+| Validation / status | `refundValidation.ts`, `refundState.ts` | captured − refunded |
 | Fee reversal | `calculateRefundFee()` in `packages/money` | complete |
-| Schema | `refunds` (0042), `transactions.refunded_fils` (0043), event types (0044) | migrated |
-| Settlement | batch reopen in `apps/settlement` | to do |
-| Webhook | add `refund.succeeded` to the eligible list in `dispatcher.ts` | to do |
-| UI | `apps/web/src/pages/transactions/RefundDrawer.tsx` | parked (commented out) |
+| Schema | `refunds` (0042), plus 0073–0074 | migrated |
+| Settlement | batches net refunds with carry-forward | done |
+| Webhook | `refund.succeeded` on dispatcher + envelope | done |
+| UI | `RefundDrawer.tsx` on the transaction page | done |
 
 It should mostly be wiring. A previous attempt (FP-170, January) was
 reverted because of the scheme file; the `refunds-v1` branch has the

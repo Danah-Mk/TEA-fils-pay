@@ -25,7 +25,21 @@ export function validateWebhookUrl(rawUrl: string, config: Pick<Config, "nodeEnv
   if (config.nodeEnv === "production" && parsed.protocol !== "https:") {
     throw new BadRequestError("invalid_url");
   }
+  if (config.nodeEnv === "production" && isPrivateOrLocalHostname(parsed.hostname)) {
+    throw new BadRequestError("invalid_url");
+  }
   return parsed;
+}
+
+function isPrivateOrLocalHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "0.0.0.0") {
+    return true;
+  }
+  if (host.endsWith(".internal") || host.endsWith(".local")) {
+    return true;
+  }
+  return /^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|169\.254\.)/.test(host);
 }
 
 export interface CreateWebhookEndpointInput {

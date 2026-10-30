@@ -37,7 +37,7 @@ func SchemeAmountBD(grossFils money.Fils) float64 {
 func buildBatchClosedPayload(
 	merchantID, batchID uuid.UUID,
 	batchDate time.Time,
-	grossFils, feeFils, netPayoutFils money.Fils,
+	grossFils, feeFils, refundFils, refundFeeReversedFils, netPayoutFils money.Fils,
 ) ([]byte, error) {
 	payload := map[string]any{
 		"merchantId":    merchantID.String(),
@@ -46,6 +46,10 @@ func buildBatchClosedPayload(
 		"grossFils":     int64(grossFils),
 		"feeFils":       int64(feeFils),
 		"netPayoutFils": int64(netPayoutFils),
+		// FP-212: refunds the batch absorbed; netPayoutFils = grossFils -
+		// feeFils - refundFils + refundFeeReversedFils.
+		"refundFils":            int64(refundFils),
+		"refundFeeReversedFils": int64(refundFeeReversedFils),
 	}
 	encoded, err := json.Marshal(payload)
 	if err != nil {

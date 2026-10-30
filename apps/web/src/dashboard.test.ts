@@ -42,6 +42,7 @@ test("bhd formats integer fils via @filspay/money, never float arithmetic", () =
   assert.equal(bhd(1), "0.001 BHD");
   assert.equal(bhd(1000), "1.000 BHD");
   assert.equal(bhd(1234567), "1234.567 BHD");
+  assert.equal(bhd(-4225), "-4.225 BHD");
 });
 
 test("dash renders absent values as an em dash but keeps zero", () => {
@@ -51,8 +52,8 @@ test("dash renders absent values as an em dash but keeps zero", () => {
   assert.equal(dash(0), "0");
 });
 
-test("dayStartIso converts a date input to a UTC day boundary", () => {
-  assert.equal(dayStartIso("2026-09-12"), "2026-09-12T00:00:00.000Z");
+test("dayStartIso converts a date input to Bahrain midnight", () => {
+  assert.equal(dayStartIso("2026-09-12"), "2026-09-12T00:00:00+03:00");
   assert.equal(dayStartIso(""), undefined);
 });
 

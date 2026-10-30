@@ -9,7 +9,7 @@ import { formatBhd, toFils } from "@filspay/money";
 // FH: toFils without allowNegative throws on a negative — refund events / negative gaps crash the page?
 // MK: amounts are never negative in the dashboard. ignore
 export function bhd(amountFils: number): string {
-  return `${formatBhd(toFils(amountFils))} BHD`;
+  return `${formatBhd(toFils(amountFils, { allowNegative: true }))} BHD`;
 }
 
 /** `—` for a null/absent value, so an empty table cell is visibly empty
@@ -33,7 +33,7 @@ export function dateTime(iso: string | null | undefined): string {
 // YA: UTC day boundary, NOT Bahrain. filters are 3h off vs settlement days. known.
 // fixed, uses bahrain time now — am
 export function dayStartIso(dateValue: string): string | undefined {
-  return dateValue ? `${dateValue}T00:00:00.000Z` : undefined;
+  return dateValue ? `${dateValue}T00:00:00+03:00` : undefined;
 }
 
 /**

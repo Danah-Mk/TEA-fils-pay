@@ -77,7 +77,8 @@ test("returns the most recently entered schedule even when an older period was b
   await insertSchedule(merchantId, 245, "2026-03-01T00:00:00Z", "2026-08-15T00:00:00Z");
 
   const current = await getCurrentFeeScheduleForDisplay(pool, merchantId);
-  assert.equal(current?.mdrBps, 245);
-  assert.equal(current?.effectiveFrom.toISOString(), "2026-03-01T00:00:00.000Z");
-  assert.equal(current?.createdAt.toISOString(), "2026-08-15T00:00:00.000Z");
+  // The live rate is the latest schedule whose effective_from is not in the
+  // future. The 245 bps row is a backfill for March; billing today is 225.
+  assert.equal(current?.mdrBps, 225);
+  assert.equal(current?.effectiveFrom.toISOString(), "2026-08-01T00:00:00.000Z");
 });

@@ -245,3 +245,48 @@ test("applyBatchClosed (via applyEvent) is idempotent: applying the identical ev
   assert.equal(Number(result.rows[0].fee_fils), 125);
   assert.equal(Number(result.rows[0].net_payout_fils), 4_875);
 });
+
+test("refund.succeeded is bucketed on the Bahrain date, not the UTC date", async () => {
+  const merchantId = await createMerchant("refund-bahrain-day");
+  const client = await pool.connect();
+  try {
+    await applyEvent(
+      client,
+      makeRow({
+        event_type: "refund.succeeded",
+        payload: { merchantId, refundId: randomUUID(), amountFils: 1_500, feeReversedFils: 0 },
+        created_at: new Date("2026-09-14T22:30:00Z"),
+      }),
+    );
+    await applyEvent(
+      client,
+      makeRow({
+        event_type: "refund.succeeded",
+        payload: { merchantId, refundId: randomUUID(), amountFils: 500, feeReversedFils: 0 },
+        created_at: new Date("2026-09-15T10:00:00Z"),
+      }),
+    );
+    await applyEvent(
+      client,
+      makeRow({
+        event_type: "refund.succeeded",
+        payload: { merchantId, refundId: randomUUID(), amountFils: 250, feeReversedFils: 0 },
+        created_at: new Date("2026-09-14T20:59:59Z"),
+      }),
+    );
+  } finally {
+    client.release();
+  }
+  const rows = await pool.query<{ d: string; refund_count: number; refund_gross_fils: string }>(
+    `SELECT volume_date::text AS d, refund_count, refund_gross_fils::text
+       FROM merchant_daily_volume WHERE merchant_id = $1 ORDER BY volume_date`,
+    [merchantId],
+  );
+  assert.deepEqual(
+    rows.rows.map((r) => [r.d, r.refund_count, Number(r.refund_gross_fils)]),
+    [
+      ["2026-09-14", 1, 250],
+      ["2026-09-15", 2, 2_000],
+    ],
+  );
+});

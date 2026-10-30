@@ -47,12 +47,10 @@ export function verifyAcquirerCallbackSignature(
   payload: unknown,
   header: string | undefined,
   secret: string,
-  requireSignature = false,
+  requireSignature = true,
 ): VerifyAcquirerCallbackResult {
   if (!header) {
-    return requireSignature
-      ? { valid: false, reason: "malformed_header" }
-      : { valid: true };
+    return { valid: false, reason: "malformed_header" };
   }
 
   const parsed = parseAcquirerSignatureHeader(header);

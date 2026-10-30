@@ -262,10 +262,12 @@ func handleRunBatch(pool *pgxpool.Pool) http.Handler {
 }
 
 // handleRebuildBalances backs the admin console's "Rebuild cached balances"
-// action. Takes no body; any body sent is ignored.
+// action (FP-203). It walks ledger_entries via RebuildAllBalances — the
+// same path as `settlement rebuild-balances` — so the button and the CLI
+// agree. Takes no body; any body sent is ignored.
 func handleRebuildBalances(pool *pgxpool.Pool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		diffs, err := ledger.RefreshBalanceCache(r.Context(), pool)
+		diffs, err := ledger.RebuildAllBalances(r.Context(), pool)
 		if err != nil {
 			log.Printf("settlement internal api: rebuild-balances failed: %v", err)
 			writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "rebuild_balances_failed"})

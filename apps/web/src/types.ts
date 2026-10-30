@@ -84,14 +84,14 @@ export type TransactionStatus =
 
 /** serializeTransaction() also returns `merchantId` — kept here so the type
  *  matches the wire shape exactly rather than a convenient subset of it. */
-// FH: no refundedFils on this DTO, so the drawer can't compute what's still refundable
-// refundedFils is there, a few lines down — am
+/** @property refundedFils Cumulative gross refunded; what can still go back is capturedFils - refundedFils. */
 export interface TransactionDto {
   id: string;
   merchantId: string;
   status: TransactionStatus;
   amountFils: number;
   capturedFils: number;
+  refundedFils: number;
   currency: string;
   reference: string | null;
   acquirerReference: string;
@@ -215,13 +215,16 @@ export interface ReplayResponse {
 // --- settlement / reconciliation ---
 export type SettlementBatchStatus = "open" | "closed" | "paid";
 
-/** @property netPayoutFils Always exactly grossFils - feeFils. */
+/** @property netPayoutFils Always exactly grossFils - feeFils - refundFils + refundFeeReversedFils
+ *  (the refund terms are 0 for a batch that absorbed no refunds). */
 export interface SettlementBatchDto {
   id: string;
   batchDate: string;
   status: SettlementBatchStatus;
   grossFils: number;
   feeFils: number;
+  refundFils: number;
+  refundFeeReversedFils: number;
   netPayoutFils: number;
   closedAt: string | null;
   paidAt: string | null;
@@ -237,6 +240,7 @@ export interface SettlementBatchListResponse {
 export interface SettlementBatchDetailDto extends SettlementBatchDto {
   includedTransactionCount: number;
   includedEventCount: number;
+  includedRefundCount: number;
 }
 
 export interface SettlementBatchTransactionDto {
@@ -272,6 +276,8 @@ export interface VolumePointDto {
   capturedCount: number;
   capturedGrossFils: number;
   voidedCount: number;
+  refundCount: number;
+  refundGrossFils: number;
 }
 
 /** `readModelAsOf` is nullable on the two lagged widgets: it reads
@@ -290,6 +296,8 @@ export interface PayoutTrendPointDto {
   status: string;
   grossFils: number;
   feeFils: number;
+  refundFils: number;
+  refundFeeReversedFils: number;
   netPayoutFils: number;
   paidAt: string | null;
 }

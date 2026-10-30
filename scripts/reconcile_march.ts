@@ -73,6 +73,13 @@ async function postResidueCorrection(client: Client, merchant: MerchantResidue, 
   if (merchant.residueFils <= 0) return;
   const entryGroupId = randomUUID();
   const description = "March 2026 scheme rounding residue sweep — manual recon per finance";
+  const already = await client.query(
+    `SELECT 1 FROM ledger_entries WHERE merchant_id = $1 AND description = $2 LIMIT 1`,
+    [merchant.merchantId, description],
+  );
+  if (already.rowCount && already.rowCount > 0) {
+    return;
+  }
   await client.query(
     `INSERT INTO ledger_entries (entry_group_id, merchant_id, account_id, direction, amount_fils, occurred_at, description)
      VALUES ($1, $2, 'merchant_payable', 'debit', $3, $4, $5),

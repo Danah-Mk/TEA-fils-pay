@@ -29,12 +29,10 @@ interface LinkStatusRow {
   expires_at: Date;
 }
 
-/** A pay request is judged against when the buyer pressed pay, so a
- * retry that lands after midnight is not penalised. */
-export function expiryReferenceTime(submittedAt?: string): Date {
-  if (!submittedAt) return new Date();
-  const parsed = new Date(submittedAt);
-  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+/** Expiry is judged on the server clock. A client-supplied submittedAt is
+ * ignored (FP-187) so a payer cannot backdate an expired link. */
+export function expiryReferenceTime(_submittedAt?: string): Date {
+  return new Date();
 }
 
 /**
@@ -66,11 +64,15 @@ export async function payPaymentLink(
     `UPDATE payment_links
         SET status = 'reserved', reserved_at = now()
       WHERE token = $1
+        AND expires_at > $3::timestamptz
         AND (
-             status = 'active'
-             OR (status = 'reserved' AND reserved_at < now() - ($2 || ' seconds')::interval)
+              status = 'active'
+           OR (
+                status = 'reserved'
+                AND reserved_at IS NOT NULL
+                AND reserved_at < now() - make_interval(secs => $2::int)
+              )
             )
-        AND expires_at > $3
       RETURNING id, merchant_id, amount_fils, reference`,
     [input.token, config.paymentLinkReservationTimeoutSeconds, expiryCheckTime],
   );
@@ -153,19 +155,13 @@ export async function payPaymentLink(
   // pays and finalizes first; we land here, answer 200, and the card was charged twice
   // MK: authorize+capture is under a second. 60s can't happen. unreachable
   if (!finalized) {
-    // Should be unreachable in normal operation (this request is the only
-    // holder of the reservation). The acquirer-side capture genuinely
-    // succeeded and money moved; failing to *record* that fact against the
-    // link is a data-consistency bug to surface loudly, not a reason to
-    // tell a customer whose card was actually charged that their payment
-    // failed.
     console.error(
       `payPaymentLink: finalize UPDATE matched 0 rows for link ${link.id} after a successful capture ` +
-        `(transaction ${txnId}) — invariant violation, investigate`,
+        `(transaction ${txnId}) — another payer won the link; do not report this charge as paid`,
     );
     return {
-      statusCode: 200,
-      body: { status: "paid", transactionId: txnId, amountFils: link.amountFils, paidAt: new Date().toISOString() },
+      statusCode: 409,
+      body: { error: "link_already_paid", transactionId: txnId },
     };
   }
 

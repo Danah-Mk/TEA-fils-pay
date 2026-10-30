@@ -59,6 +59,9 @@ export function AdjustmentImportPage() {
   /** Amounts are BD with three decimals and are parsed server-side with parseBhdToFils. */
   async function handleApply(event: React.FormEvent): Promise<void> {
     event.preventDefault();
+    if (!window.confirm("Apply this CSV to the ledger now? Duplicate content is refused, but this posts money.")) {
+      return;
+    }
     setBusy(true);
     setError(null);
     setNotice(null);

@@ -5,11 +5,12 @@ import type { ReportingConfig } from "../config.js";
 import { readCursor, advanceCursor } from "./cursor.js";
 import { applyEvent, type OutboxEventRow } from "./applyEvent.js";
 
-// am: refund.succeeded not here yet. when refunds ship just add it to the list
 export const REPORTING_EVENT_TYPES: readonly EventType[] = [
   "transaction.captured",
   "transaction.voided",
   "settlement.batch_closed",
+  "settlement.paid",
+  "refund.succeeded",
 ];
 
 /**
@@ -48,6 +49,7 @@ export async function runConsumerPass(
          FROM outbox_events
         WHERE id > $1
           AND event_type = ANY($2::text[])
+          AND xmin::text::bigint < pg_snapshot_xmin(pg_current_snapshot())::text::bigint
         ORDER BY id ASC
         LIMIT $3`,
       [cursor.lastProcessedId.toString(), REPORTING_EVENT_TYPES, config.consumerBatchLimit],

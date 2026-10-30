@@ -130,15 +130,14 @@ test("runConsumerPass: atomicity — an apply failure partway through a multi-ev
     payload: { merchantId, amountCapturedFils: 1_234, feeFils: 18, newStatus: "captured", capturedTotalFils: 1_234 },
   });
 
-  // Event 2: malformed — missing merchantId entirely, so
-  // applyTransactionVoided's INSERT sends a NULL into
-  // merchant_daily_volume.merchant_id, violating its NOT NULL constraint
-  // and throwing partway through the batch (event 2 of 2, ordered by id).
+  // Event 2: a UUID that is not a merchants row. Empty payloads are
+  // skipped (archive-replay fixtures insert '{}'), so the poison that
+  // still throws mid-batch is the FK on merchant_daily_volume.merchant_id.
   const badEvent = await enqueueEvent(pool, {
     eventType: "transaction.voided",
     aggregateType: "transaction",
     aggregateId: randomUUID(),
-    payload: {}, // no merchantId
+    payload: { merchantId: "00000000-0000-0000-0000-000000000000" },
   });
   assert.ok(badEvent.id > goodEvent.id, "bad event sorts after the good one, so the good one is applied first");
 

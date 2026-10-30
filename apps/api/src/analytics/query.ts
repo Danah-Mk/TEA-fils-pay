@@ -48,6 +48,9 @@ export interface VolumePointDto {
   capturedCount: number;
   capturedGrossFils: number;
   voidedCount: number;
+  /** Refunds made that Bahrain day, and the gross returned to cardholders. */
+  refundCount: number;
+  refundGrossFils: number;
 }
 
 export interface VolumesResponse {
@@ -66,6 +69,8 @@ interface VolumeRow {
   captured_count: number;
   captured_gross_fils: string | number;
   voided_count: number;
+  refund_count: number;
+  refund_gross_fils: string | number;
 }
 
 interface CursorRow {
@@ -90,6 +95,8 @@ function serializeVolumePoint(row: VolumeRow): VolumePointDto {
     capturedCount: row.captured_count,
     capturedGrossFils: Number(row.captured_gross_fils),
     voidedCount: row.voided_count,
+    refundCount: row.refund_count,
+    refundGrossFils: Number(row.refund_gross_fils),
   };
 }
 
@@ -114,7 +121,7 @@ export async function getVolumes(
 ): Promise<VolumesResponse> {
   const [pointsResult, asOf] = await Promise.all([
     pool.query<VolumeRow>(
-      `SELECT volume_date, captured_count, captured_gross_fils, voided_count
+      `SELECT volume_date, captured_count, captured_gross_fils, voided_count, refund_count, refund_gross_fils
          FROM merchant_daily_volume
         WHERE merchant_id = $1 AND volume_date >= $2 AND volume_date < $3
         ORDER BY volume_date ASC`,
@@ -136,6 +143,9 @@ export interface PayoutTrendPointDto {
   status: string;
   grossFils: number;
   feeFils: number;
+  /** Refunds this batch took out of the payout, and the MDR given back on them. */
+  refundFils: number;
+  refundFeeReversedFils: number;
   netPayoutFils: number;
   paidAt: string | null;
 }
@@ -152,6 +162,8 @@ interface PayoutTrendRow {
   status: string;
   gross_fils: string | number;
   fee_fils: string | number;
+  refund_fils: string | number;
+  refund_fee_reversed_fils: string | number;
   net_payout_fils: string | number;
   paid_at: Date | null;
 }
@@ -163,6 +175,8 @@ function serializePayoutTrendPoint(row: PayoutTrendRow): PayoutTrendPointDto {
     status: row.status,
     grossFils: Number(row.gross_fils),
     feeFils: Number(row.fee_fils),
+    refundFils: Number(row.refund_fils),
+    refundFeeReversedFils: Number(row.refund_fee_reversed_fils),
     netPayoutFils: Number(row.net_payout_fils),
     paidAt: row.paid_at ? row.paid_at.toISOString() : null,
   };
@@ -181,7 +195,8 @@ export async function getPayoutTrends(
 ): Promise<PayoutTrendsResponse> {
   const [pointsResult, asOf] = await Promise.all([
     pool.query<PayoutTrendRow>(
-      `SELECT settlement_batch_id, batch_date, status, gross_fils, fee_fils, net_payout_fils, paid_at
+      `SELECT settlement_batch_id, batch_date, status, gross_fils, fee_fils, refund_fils, refund_fee_reversed_fils,
+            net_payout_fils, paid_at
          FROM merchant_payout_trends
         WHERE merchant_id = $1 AND batch_date >= $2 AND batch_date < $3
         ORDER BY batch_date ASC`,
@@ -303,7 +318,8 @@ export async function getRecentLedgerActivity(
     `SELECT id, account_id, direction, amount_fils, occurred_at, description
        FROM ledger_entries
       WHERE merchant_id = $1
-        AND (occurred_at AT TIME ZONE 'Asia/Bahrain')::date BETWEEN $2::date AND $3::date
+        AND (occurred_at AT TIME ZONE 'Asia/Bahrain')::date >= $2::date
+        AND (occurred_at AT TIME ZONE 'Asia/Bahrain')::date < $3::date
       ORDER BY occurred_at DESC
       LIMIT 200`,
     [input.merchantId, input.from, input.to],

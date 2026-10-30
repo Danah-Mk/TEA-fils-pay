@@ -16,6 +16,12 @@ async function main(): Promise<void> {
     throw new Error("seed: DATABASE_URL environment variable is not set");
   }
 
+  // generate() TRUNCATEs merchants, ledger_entries, transactions... in whatever database DATABASE_URL points at.
+  // Refuse to do that in production unless the operator says so explicitly.
+  if (process.env.NODE_ENV === "production" && process.env.SEED_ALLOW_DESTRUCTIVE_RESET !== "yes") {
+    throw new Error("seed: refusing to TRUNCATE tables with NODE_ENV=production (set SEED_ALLOW_DESTRUCTIVE_RESET=yes to override)");
+  }
+
   // SEED_SIZE accepts small | full, but only 'small' is really implemented
   // so far — 'full' currently generates the same data.
   const seedSize = process.env.SEED_SIZE ?? "small";

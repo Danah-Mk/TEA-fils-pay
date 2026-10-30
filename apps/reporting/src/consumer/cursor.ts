@@ -29,9 +29,10 @@ export async function readCursor(client: QueryableClient, consumerName: string):
     [consumerName],
   );
 
-  const result = (await client.query(`SELECT last_processed_id FROM reporting_outbox_cursor WHERE consumer_name = $1`, [
-    consumerName,
-  ])) as { rows: CursorRow[] };
+  const result = (await client.query(
+    `SELECT last_processed_id FROM reporting_outbox_cursor WHERE consumer_name = $1 FOR UPDATE`,
+    [consumerName],
+  )) as { rows: CursorRow[] };
 
   const row = result.rows[0];
   return { lastProcessedId: row ? BigInt(row.last_processed_id) : 0n };

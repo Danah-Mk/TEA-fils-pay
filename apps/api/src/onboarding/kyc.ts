@@ -13,7 +13,7 @@ export type KycDocumentType = "commercial_registration" | "owner_id" | "proof_of
 /** Document types the registry/bank issues as a PDF, never as a photo. */
 const PDF_ONLY_DOCUMENT_TYPES: readonly KycDocumentType[] = ["commercial_registration", "bank_letter"];
 
-/** @property fileName Informational only; never used for validation. */
+/** @property fileName Used for the PDF-only document types (must end in .pdf). */
 export interface RecordKycDocumentInput {
   merchantId: string;
   documentType: KycDocumentType;
@@ -64,7 +64,8 @@ export async function recordKycDocument(
   // already confirmed the bytes are one of our three accepted formats, so
   // this only narrows which of those three this particular document type
   // requires.
-  if (PDF_ONLY_DOCUMENT_TYPES.includes(input.documentType) && !input.fileName.toLowerCase().endsWith(".pdf")) {
+  const fileNameIsPdf = input.fileName.toLowerCase().endsWith(".pdf");
+  if (PDF_ONLY_DOCUMENT_TYPES.includes(input.documentType) && (detected !== "pdf" || !fileNameIsPdf)) {
     throw new UnprocessableEntityError("document_must_be_pdf", "commercial_registration and bank_letter documents must be a PDF");
   }
 

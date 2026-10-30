@@ -59,6 +59,9 @@ export function SettlementPage() {
   /** Idempotent per business date: re-running returns the already-closed batches. */
   async function handleRunBatch(event: React.FormEvent): Promise<void> {
     event.preventDefault();
+    if (!window.confirm(`Close and pay the settlement batch for ${date}? This posts ledger money.`)) {
+      return;
+    }
     setRunBusy(true);
     setRunError(null);
     setRunResult(null);
@@ -106,6 +109,13 @@ export function SettlementPage() {
   // FH: ADMIN.md says this is safe
   async function handleRecalculateMdr(event: React.FormEvent): Promise<void> {
     event.preventDefault();
+    if (
+      !window.confirm(
+        `Recalculate MDR for this merchant from ${mdrFrom} to ${mdrTo}? Paid batches will not be rewritten.`,
+      )
+    ) {
+      return;
+    }
     setMdrBusy(true);
     setMdrError(null);
     setMdrResult(null);

@@ -9,16 +9,16 @@ Mahmood has the context for most of it.
 
 ## State of things
 
-**Refunds.** `POST /v1/refunds` returns 501. `processRefund.ts` is the
-helper and I'd consider it done: it needs the route and the drawer wired.
-Fee reversal goes through `calculateRefundFee`, which sums back to the
-original fee across partials.
+**Refunds (FP-212).** Shipped: `POST /v1/refunds` is live (was a 501 stub).
+`processRefund` now locks the transaction row, scopes by merchant, defaults
+reason to `unspecified`, refunds captured-not-authorized remainder, and
+releases the leftover hold. Settlement batches net refunds; `refund.succeeded`
+is on the webhook and reporting paths. The dashboard refund drawer is restored.
 
-**Scheme residue.** I added `0038_scheme_export_lines_amount_3dp.sql` so
-each export line keeps the untruncated three-decimal amount next to the
-two-decimal one, and the residue posting reads the difference. Next step was
-posting residue to `scheme_rounding_residue` inside CloseBatch. I didn't get
-to it — nothing posts residue yet except what finance runs by hand.
+**Scheme residue.** CloseBatch now truncates each export line to a multiple
+of 10 fils, stores that truncated figure, and journals `gross - truncated`
+to `scheme_rounding_residue` (ADR-0002). The March one-off script is
+idempotent (skips a merchant that already has the sweep description).
 
 > **MK (May):** 0038 was replaced by the KYC thumbnail migration; `amount_3dp` is gone. 0050 covers the scheme amount now.
 
@@ -55,22 +55,23 @@ DST. `BusinessDayWindow` in window.go is correct and tested. The daemon's
 runs, but the comment there says Bahrain.
 
 **Impersonation** maps every admin to the `support` merchant role and is
-read-only.
+read-only. Capture, void and refund refuse impersonation writes.
 
 **Credits.** The second approver is compared by admin user id. The
 effective date is metadata; ledger rows go in at now().
 
-**Callbacks.** Acquirer callbacks are recorded in `processed_events` before
-they're applied, so redeliveries are dropped. (The README describes this.)
+**Callbacks.** Acquirer callbacks insert into `processed_events` first
+(`ON CONFLICT DO NOTHING`). Missing signatures are rejected. Signature
+requirement defaults on.
 
 **Not finished:** per-service DB roles and TLS (compose uses one role and
 `sslmode=disable`); outbox consumption by commit order instead of id (the
 xid8 query is in a gist); the shadow ledger (Mahmood's idea — I'd skip it).
 
-**Migration gaps** (0039, 0041, 0054–56) are PRs I abandoned. No database
-ever ran them, except possibly staging-2, which once ran a branch.
-
-> **MK:** 0054 ran on staging-2 and created `chargeback_cases`, I'm fairly sure. staging-2 has since been reseeded so we can't check
+**Migrations 0054 and 0055** used to fail on a fresh database (view on a
+missing table; columns that did not exist). They are rewritten. 0056 is the
+API-key revoke migration, not v2 ledger. New: 0073–0076 (refunds, import
+dedupe, live_sessions filter, processed_events, BIGINT volume).
 
 ## People
 

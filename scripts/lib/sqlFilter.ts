@@ -7,7 +7,12 @@ export function buildWhere(
   for (const [col, val] of Object.entries(filters)) {
     if (val === undefined || val === null) continue;
     if (Array.isArray(val)) {
-      if (val.length === 0) continue;
+      // An empty list means "match nothing", not "no filter": skipping it turned DELETE ... WHERE id = ANY([]) into
+      // a bare DELETE of the whole table.
+      if (val.length === 0) {
+        parts.push("FALSE");
+        continue;
+      }
       values.push(val);
       parts.push(`${col} = ANY($${idx}::uuid[])`);
       idx++;

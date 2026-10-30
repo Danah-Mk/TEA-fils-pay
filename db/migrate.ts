@@ -11,6 +11,7 @@
  *
  * Usage: DATABASE_URL=postgres://... npx tsx db/migrate.ts
  */
+import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,16 +36,30 @@ async function main(): Promise<void> {
 
     let appliedCount = 0;
     for (const filename of files) {
+      const sql = readFileSync(join(MIGRATIONS_DIR, filename), "utf8");
+      const checksum = createHash("sha256").update(sql).digest("hex");
       if (applied.has(filename)) {
+        const stored = await client.query<{ checksum: string | null }>(
+          `SELECT checksum FROM schema_migrations WHERE filename = $1`,
+          [filename],
+        );
+        const previous = stored.rows[0]?.checksum;
+        if (previous && previous !== checksum) {
+          throw new Error(
+            `migrate: ${filename} has changed since it was applied (stored ${previous}, now ${checksum})`,
+          );
+        }
         console.log(`SKIP  ${filename}  (already applied)`);
         continue;
       }
 
-      const sql = readFileSync(join(MIGRATIONS_DIR, filename), "utf8");
       await client.query("BEGIN");
       try {
         await client.query(sql);
-        await client.query("INSERT INTO schema_migrations (filename) VALUES ($1)", [filename]);
+        await client.query("INSERT INTO schema_migrations (filename, checksum) VALUES ($1, $2)", [
+          filename,
+          checksum,
+        ]);
         await client.query("COMMIT");
         console.log(`APPLY ${filename}`);
         appliedCount += 1;
@@ -72,9 +87,11 @@ async function bootstrapSchemaMigrationsTable(client: Client): Promise<void> {
   await client.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       filename    TEXT PRIMARY KEY,
-      applied_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+      applied_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      checksum    TEXT
     )
   `);
+  await client.query(`ALTER TABLE schema_migrations ADD COLUMN IF NOT EXISTS checksum TEXT`);
 }
 
 async function getAppliedMigrations(client: Client): Promise<Set<string>> {

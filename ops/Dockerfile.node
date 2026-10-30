@@ -1,0 +1,20 @@
+# Image for apps/api, apps/reporting, and the one-off migrate/seed jobs.
+# Build context is the repo root (compose: context: .., dockerfile: ops/Dockerfile.node).
+FROM node:22-slim
+WORKDIR /app
+ENV NODE_ENV=production
+# Workspaces: copy manifests first so `npm ci` is cached until a dependency changes.
+COPY package.json package-lock.json ./
+COPY packages ./packages
+COPY apps/api/package.json apps/api/package.json
+COPY apps/reporting/package.json apps/reporting/package.json
+COPY apps/web/package.json apps/web/package.json
+COPY apps/admin/package.json apps/admin/package.json
+# tsx (a devDependency) runs the TypeScript directly, so install dev deps too.
+RUN npm ci --include=dev
+COPY . .
+USER node
+EXPOSE 3000
+# api: npx tsx apps/api/src/index.ts | reporting: npx tsx apps/reporting/src/index.ts
+# migrate: npm run migrate
+CMD ["npx", "tsx", "apps/api/src/index.ts"]

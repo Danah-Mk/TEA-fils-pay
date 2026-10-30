@@ -34,10 +34,19 @@ export async function applyAcquirerCallback(pool: Pool, callback: AcquirerCallba
     throw new NotFoundError("transaction_not_found");
   }
 
+  const claimed = await pool.query(
+    `INSERT INTO processed_events (callback_id) VALUES ($1) ON CONFLICT (callback_id) DO NOTHING RETURNING callback_id`,
+    [callback.callbackId],
+  );
+  if (claimed.rowCount === 0) {
+    return;
+  }
+
   await pool.query(
     `INSERT INTO acquirer_callback_notes
         (transaction_id, merchant_id, callback_id, callback_type, outcome, note, received_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT (callback_id) DO NOTHING`,
     [
       callback.transactionId,
       txnRow.merchant_id,

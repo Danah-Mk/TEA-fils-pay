@@ -42,6 +42,7 @@ export function createFetchTransport(): WebhookTransport {
         headers: req.headers,
         body: req.body,
         signal: controller.signal,
+        redirect: "error",
       });
       // unbounded read, a 1gb response would oom us? — am
       // MK: timeoutMs bounds it. fine for now, revisit after Eid inshallah
