@@ -63,7 +63,12 @@ export function SettlementBatchListPage() {
 
   return (
     <section>
-      <h1>Settlement batches</h1>
+      <div className="dash-page-head">
+        <div>
+          <h1>Settlement batches</h1>
+          <p>One row per Bahrain business day.</p>
+        </div>
+      </div>
 
       <fieldset className="dash-filters">
         <legend>Batch date</legend>
@@ -93,43 +98,46 @@ export function SettlementBatchListPage() {
 
       {error ? <p className="dash-error">{error}</p> : null}
 
-      <table className="dash-table">
-        <thead>
-          <tr>
-            <th>Batch date</th>
-            <th>Status</th>
-            <th>Gross</th>
-            <th>Fee</th>
-            <th>Net payout</th>
-            <th>Closed</th>
-            <th>Paid</th>
-          </tr>
-        </thead>
-        <tbody>
-          {batches.map((batch) => (
-            <tr key={batch.id}>
-              <td>
-                <Link to={`/dashboard/settlement/${batch.id}`}>{batch.batchDate}</Link>
-              </td>
-              <td>
-                <span className={`dash-status dash-status-${batch.status}`}>{batch.status}</span>
-              </td>
-              <td>{bhd(batch.grossFils)}</td>
-              <td>{bhd(batch.feeFils)}</td>
-              <td>{bhd(batch.netPayoutFils)}</td>
-              <td>{dateTime(batch.closedAt)}</td>
-              <td>{dateTime(batch.paidAt)}</td>
-            </tr>
-          ))}
-          {batches.length === 0 && !loading ? (
-            <tr>
-              <td colSpan={7}>No settlement batches match these filters.</td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
+      {batches.length === 0 && !loading ? (
+        <div className="dash-empty">
+          <p>No settlement batches match these filters.</p>
+        </div>
+      ) : (
+        <div className="dash-table-wrap">
+          <table className="dash-table">
+            <thead>
+              <tr>
+                <th className="dash-nowrap">Batch date</th>
+                <th>Status</th>
+                <th className="dash-num">Gross</th>
+                <th className="dash-num">Fee</th>
+                <th className="dash-num">Net payout</th>
+                <th className="dash-nowrap">Closed</th>
+                <th className="dash-nowrap">Paid</th>
+              </tr>
+            </thead>
+            <tbody>
+              {batches.map((batch) => (
+                <tr key={batch.id}>
+                  <td className="dash-nowrap">
+                    <Link to={`/dashboard/settlement/${batch.id}`}>{batch.batchDate}</Link>
+                  </td>
+                  <td>
+                    <span className={`dash-status dash-status-${batch.status}`}>{batch.status}</span>
+                  </td>
+                  <td className="dash-num">{bhd(batch.grossFils)}</td>
+                  <td className="dash-num">{bhd(batch.feeFils)}</td>
+                  <td className="dash-num">{bhd(batch.netPayoutFils)}</td>
+                  <td className="dash-nowrap">{dateTime(batch.closedAt)}</td>
+                  <td className="dash-nowrap">{dateTime(batch.paidAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-      {loading ? <p>Loading...</p> : null}
+      {loading ? <p className="dash-muted">Loading…</p> : null}
 
       <Pagination nextCursor={nextCursor} loading={loading} onLoadMore={() => void load(nextCursor)} />
     </section>

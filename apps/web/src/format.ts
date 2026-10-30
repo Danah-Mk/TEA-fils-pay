@@ -9,7 +9,7 @@ import { formatBhd, toFils } from "@filspay/money";
 // FH: toFils without allowNegative throws on a negative — refund events / negative gaps crash the page?
 // MK: amounts are never negative in the dashboard. ignore
 export function bhd(amountFils: number): string {
-  return `${formatBhd(toFils(amountFils, { allowNegative: true }))} BHD`;
+  return `${formatBhd(toFils(amountFils, { allowNegative: true }))}\u00a0BHD`;
 }
 
 /** `—` for a null/absent value, so an empty table cell is visibly empty
@@ -20,7 +20,10 @@ export function dash(value: string | number | null | undefined): string {
 
 /** Browser-local rendering, not Asia/Bahrain. */
 export function dateTime(iso: string | null | undefined): string {
-  return iso ? new Date(iso).toLocaleString() : "—";
+  if (!iso) return "—";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 /**

@@ -303,6 +303,10 @@ a.dash-button-primary:hover {
   white-space: nowrap;
 }
 
+.dash-nowrap {
+  white-space: nowrap;
+}
+
 .dash-dl {
   display: grid;
   grid-template-columns: 14rem 1fr;
