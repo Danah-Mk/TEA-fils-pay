@@ -19,7 +19,7 @@ type PayState =
   | { kind: "declined"; message: string; retryable: boolean }
   | { kind: "terminal"; message: string };
 
-const EMPTY_CARD: SimulatedCardInput = { pan: "", expiryMonth: 1, expiryYear: new Date().getFullYear() + 1, cvv: "" };
+const EMPTY_CARD: SimulatedCardInput = { pan: "", expiryMonth: 0, expiryYear: 0, cvv: "" };
 
 function groupPan(value: string): string {
   return value.replace(/\D/g, "").slice(0, 19).replace(/(\d{4})(?=\d)/g, "$1 ");
@@ -251,26 +251,33 @@ export function CheckoutPage() {
           <label>
             Month
             <input
-              type="number"
-              min={1}
-              max={12}
+              type="text"
+              inputMode="numeric"
               required
+              maxLength={2}
               placeholder="12"
               autoComplete="cc-exp-month"
-              value={card.expiryMonth}
-              onChange={(e) => setCard({ ...card, expiryMonth: Number(e.target.value) })}
+              value={card.expiryMonth || ""}
+              onChange={(e) => {
+                const n = Number(e.target.value.replace(/\D/g, "").slice(0, 2));
+                setCard({ ...card, expiryMonth: Number.isFinite(n) ? n : 0 });
+              }}
             />
           </label>
           <label>
             Year
             <input
-              type="number"
-              min={new Date().getFullYear()}
+              type="text"
+              inputMode="numeric"
               required
+              maxLength={4}
               placeholder="2030"
               autoComplete="cc-exp-year"
-              value={card.expiryYear}
-              onChange={(e) => setCard({ ...card, expiryYear: Number(e.target.value) })}
+              value={card.expiryYear || ""}
+              onChange={(e) => {
+                const n = Number(e.target.value.replace(/\D/g, "").slice(0, 4));
+                setCard({ ...card, expiryYear: Number.isFinite(n) ? n : 0 });
+              }}
             />
           </label>
           <label>

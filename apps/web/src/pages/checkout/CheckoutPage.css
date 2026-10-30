@@ -14,6 +14,7 @@
   border: 1px solid var(--fp-line);
   border-radius: 16px;
   box-shadow: var(--fp-shadow);
+  overflow: hidden;
 }
 
 .checkout-kicker {
@@ -82,7 +83,10 @@
 }
 
 .checkout-form input {
-  padding: 0.65rem 0.75rem;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.65rem 0.7rem;
   font-size: 1rem;
   border: 1px solid var(--fp-line);
   border-radius: 8px;
@@ -92,8 +96,12 @@
 
 .checkout-form-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 0.85fr;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.15fr) minmax(0, 0.85fr);
   gap: 0.5rem;
+}
+
+.checkout-form-row label {
+  min-width: 0;
 }
 
 .checkout-form button {
