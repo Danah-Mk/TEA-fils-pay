@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAdminAuth } from "../auth/AdminAuthContext.js";
-import { describeError, WEB_BASE_URL } from "../api/client.js";
+import { describeError, webBaseUrl } from "../api/client.js";
 import { ImpersonationBanner } from "./ImpersonationBanner.js";
 
 /** Nav shell for every admin-plane screen: who you are signed in as, the
@@ -64,7 +64,7 @@ export function AdminLayout() {
             and return to the admin console.
           </p>
           <p>
-            Merchant screens are at <code>{WEB_BASE_URL}</code> while the grant lasts.
+            Merchant screens are at <code>{webBaseUrl()}</code> while the grant lasts.
           </p>
         </main>
       ) : (

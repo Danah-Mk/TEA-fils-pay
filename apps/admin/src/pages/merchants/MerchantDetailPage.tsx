@@ -6,7 +6,7 @@ import { adjustBalance } from "../../api/balanceAdjustments.js";
 import { issueCredit } from "../../api/credits.js";
 import { rotateApiKey } from "../../api/apiKeys.js";
 import { startImpersonation } from "../../api/impersonation.js";
-import { describeError, WEB_BASE_URL } from "../../api/client.js";
+import { describeError, webBaseUrl } from "../../api/client.js";
 import { useAdminAuth } from "../../auth/AdminAuthContext.js";
 import { RequireRole } from "../../auth/RequireRole.js";
 import type { AdminMerchantDetail, CreditReasonCode, RotatedApiKey } from "../../types.js";
@@ -210,8 +210,8 @@ export function MerchantDetailPage() {
       // Opened in a second tab on purpose: this tab keeps showing the
       // impersonation banner and its exit action, which is the whole point
       // of the banner existing.
-      const opened = window.open(WEB_BASE_URL, "_blank", "noopener");
-      if (!opened) setImpersonationUrl(WEB_BASE_URL);
+      const opened = window.open(webBaseUrl(), "_blank", "noopener");
+      if (!opened) setImpersonationUrl(webBaseUrl());
     } catch (err) {
       setActionError(describeError(err));
     } finally {

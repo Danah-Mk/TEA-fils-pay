@@ -4,9 +4,16 @@ const API_BASE_URL = (import.meta.env.VITE_ADMIN_API_BASE_URL as string | undefi
 
 /** apps/web's own dashboard origin — where a "view as merchant" grant is
  *  actually exercised. */
-// FH: used to build the impersonation link
-export const WEB_BASE_URL =
-  (import.meta.env.VITE_WEB_BASE_URL as string | undefined) ?? "http://localhost:5173";
+export function webBaseUrl(): string {
+  const configured = import.meta.env.VITE_WEB_BASE_URL as string | undefined;
+  if (configured) return configured;
+  if (typeof window !== "undefined") {
+    const { protocol, hostname, port } = window.location;
+    if (port === "8081") return `${protocol}//${hostname}:8080`;
+    if (port === "5174") return `${protocol}//${hostname}:5173`;
+  }
+  return "http://localhost:5173";
+}
 
 /** Mirrors apps/api's own uniform `{ error, message? }` body
  *  (lib/errors.ts / plugins/errorHandler.ts) — one error shape end to
