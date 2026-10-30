@@ -103,3 +103,14 @@ export function formatCardBrandHint(pan: string): "visa" | "mastercard" | "amex"
   if (/^3[47]/.test(digits)) return "amex";
   return "unknown";
 }
+
+/** UUID for Idempotency-Key. `crypto.randomUUID()` throws on plain http
+ *  (Dilmune's IP is not a secure context); getRandomValues does not. */
+export function newIdempotencyKey(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}

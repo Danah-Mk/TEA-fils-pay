@@ -51,7 +51,9 @@ interface MerchantUserRow {
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   /** POST /v1/auth/login — step 1. */
   app.post<{ Body: LoginBody }>("/login", async (request, reply) => {
-    const { merchantId, email, password } = request.body ?? {};
+    const merchantId = request.body?.merchantId?.trim();
+    const email = request.body?.email?.trim();
+    const password = request.body?.password;
     if (!merchantId || !email || !password) {
       throw new BadRequestError("invalid_request", "merchantId, email and password are required");
     }
@@ -182,6 +184,16 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       if (!merchantUserResult) {
         throw new Error("otp/verify: merchant_users row disappeared mid-transaction");
       }
+
+      // Same as admin otp/verify: pending cookie maxAge is 10 minutes.
+      // promoteSession extends the row to 12h; the browser cookie must match.
+      reply.setCookie(app.config.cookieName, rawToken, {
+        httpOnly: true,
+        path: "/",
+        sameSite: "lax",
+        secure: app.config.cookieSecure,
+        maxAge: app.config.sessionTtlHours * 3_600,
+      });
 
       reply.code(200).send({
         authenticated: true,

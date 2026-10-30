@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { request } from "../../api/client.js";
 import { describeError } from "../../api/client.js";
+import { newIdempotencyKey } from "../../utils/helpers.js";
 import { RequireRole } from "../../auth/RequireRole.js";
 import { bhd } from "../../format.js";
 import type { TransactionDto } from "../../types.js";
@@ -60,7 +61,7 @@ export function RefundDrawer({ txn, onRefunded }: RefundDrawerProps) {
       // everything still refundable — its own documented default, same
       // affordance the capture form has.
       const body = trimmed === "" ? { transactionId: txn.id } : { transactionId: txn.id, amountFils: Number(trimmed) };
-      attemptKey.current ??= crypto.randomUUID();
+      attemptKey.current ??= newIdempotencyKey();
 
       await request<RefundResponse>("/v1/refunds", {
         method: "POST",

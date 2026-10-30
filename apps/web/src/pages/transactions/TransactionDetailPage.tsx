@@ -9,6 +9,7 @@ import {
 import { ApiError, describeError } from "../../api/client.js";
 import { RequireRole } from "../../auth/RequireRole.js";
 import { bhd, dash, dateTime } from "../../format.js";
+import { newIdempotencyKey } from "../../utils/helpers.js";
 import type { TransactionDto, TransactionEventDto } from "../../types.js";
 import { RefundDrawer } from "./RefundDrawer.js";
 
@@ -73,7 +74,7 @@ export function TransactionDetailPage() {
       const input = trimmed === "" ? {} : { amountFils: Number(trimmed) };
       // A fresh Idempotency-Key per click, including a retry after a decline —
       // same discipline as the checkout page's submit handler.
-      await captureTransaction(id, input, crypto.randomUUID());
+      await captureTransaction(id, input, newIdempotencyKey());
       setCaptureOpen(false);
       setCaptureAmount("");
       // Refetch rather than patch: a capture wrote a new transaction_events

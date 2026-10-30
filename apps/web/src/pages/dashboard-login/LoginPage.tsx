@@ -61,7 +61,11 @@ export function LoginPage() {
     setError(null);
     setNotice(null);
     try {
-      const challenge = await login({ merchantId: merchantId.trim(), email, password });
+      const challenge = await login({
+        merchantId: merchantId.trim(),
+        email: email.trim(),
+        password: password.trim(),
+      });
       setStep({ kind: "otp", challenge });
       setPassword("");
     } catch (err) {

@@ -40,7 +40,7 @@ export function LoginPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const challenge = await login({ email, password });
+      const challenge = await login({ email: email.trim(), password: password.trim() });
       setStep({ kind: "otp", challenge });
       setPassword("");
     } catch (err) {

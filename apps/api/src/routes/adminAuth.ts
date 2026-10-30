@@ -52,7 +52,8 @@ interface AdminUserRow {
  */
 export async function adminAuthRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Body: LoginBody }>("/login", async (request, reply) => {
-    const { email, password } = request.body ?? {};
+    const email = request.body?.email?.trim();
+    const password = request.body?.password;
     if (!email || !password) {
       throw new BadRequestError("invalid_request", "email and password are required");
     }
