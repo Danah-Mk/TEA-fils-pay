@@ -83,7 +83,12 @@ export function TransactionListPage() {
 
   return (
     <section>
-      <h1>Transactions</h1>
+      <div className="dash-page-head">
+        <div>
+          <h1>Transactions</h1>
+          <p>Payments on this shop, newest first.</p>
+        </div>
+      </div>
 
       <fieldset className="dash-filters">
         <legend>Status</legend>
@@ -126,45 +131,49 @@ export function TransactionListPage() {
 
       {error ? <p className="dash-error">{error}</p> : null}
 
-      <p>{pluralize(transactions.length, "transaction")} loaded</p>
+      <p className="dash-muted">{pluralize(transactions.length, "transaction")} loaded</p>
 
-      <table className="dash-table">
-        <thead>
-          <tr>
-            <th>Occurred</th>
-            <th>Reference</th>
-            <th>Status</th>
-            <th>Authorized</th>
-            <th>Captured</th>
-            <th>Acquirer reference</th>
-          </tr>
-        </thead>
-        <tbody>
-          {transactions.map((txn) => (
-            <tr key={txn.id}>
-              <td>
-                <Link to={`/dashboard/transactions/${txn.id}`}>{dateTime(txn.occurredAt)}</Link>
-              </td>
-              <td>{dash(txn.reference)}</td>
-              <td>
-                <span className={classNames("dash-status", `dash-status-${txn.status}`)}>{txn.status}</span>
-              </td>
-              <td>{bhd(txn.amountFils)}</td>
-              <td>{bhd(txn.capturedFils)}</td>
-              <td>
-                <code>{truncateMiddle(txn.acquirerReference, 20)}</code>
-              </td>
-            </tr>
-          ))}
-          {transactions.length === 0 && !loading ? (
-            <tr>
-              <td colSpan={6}>No transactions match these filters.</td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
+      {transactions.length === 0 && !loading ? (
+        <div className="dash-empty">
+          <p>No transactions match these filters.</p>
+          <p>Create a payment link, or clear the dates and statuses.</p>
+        </div>
+      ) : (
+        <div className="dash-table-wrap">
+          <table className="dash-table">
+            <thead>
+              <tr>
+                <th>Occurred</th>
+                <th>Reference</th>
+                <th>Status</th>
+                <th className="dash-num">Authorized</th>
+                <th className="dash-num">Captured</th>
+                <th>Acquirer reference</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transactions.map((txn) => (
+                <tr key={txn.id}>
+                  <td>
+                    <Link to={`/dashboard/transactions/${txn.id}`}>{dateTime(txn.occurredAt)}</Link>
+                  </td>
+                  <td>{dash(txn.reference)}</td>
+                  <td>
+                    <span className={classNames("dash-status", `dash-status-${txn.status}`)}>{txn.status}</span>
+                  </td>
+                  <td className="dash-num">{bhd(txn.amountFils)}</td>
+                  <td className="dash-num">{bhd(txn.capturedFils)}</td>
+                  <td>
+                    <code>{truncateMiddle(txn.acquirerReference, 20)}</code>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-      {loading ? <p>Loading...</p> : null}
+      {loading ? <p className="dash-muted">Loading…</p> : null}
 
       <Pagination nextCursor={nextCursor} loading={loading} onLoadMore={() => void load(nextCursor)} />
     </section>

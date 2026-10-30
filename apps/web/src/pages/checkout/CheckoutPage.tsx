@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactElement, type ReactNode } from "react";
 import { useParams } from "react-router-dom";
 import { formatBhd, toFils } from "@filspay/money";
 import { getPaymentLink, payPaymentLink } from "../../api/paymentLinks.js";
 import { ApiError } from "../../api/client.js";
-import { newIdempotencyKey } from "../../utils/helpers.js";
+import { formatCardBrandHint, newIdempotencyKey } from "../../utils/helpers.js";
 import type { PaymentLinkPublicDto, PayPaymentLinkResponse, SimulatedCardInput } from "../../types.js";
 import "./CheckoutPage.css";
 
@@ -20,6 +20,18 @@ type PayState =
   | { kind: "terminal"; message: string };
 
 const EMPTY_CARD: SimulatedCardInput = { pan: "", expiryMonth: 1, expiryYear: new Date().getFullYear() + 1, cvv: "" };
+
+function groupPan(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 19).replace(/(\d{4})(?=\d)/g, "$1 ");
+}
+
+function shell(children: ReactNode): ReactElement {
+  return (
+    <div className="checkout-shell">
+      <main className="checkout-page">{children}</main>
+    </div>
+  );
+}
 
 export function CheckoutPage() {
   const { token } = useParams<{ token: string }>();
@@ -61,7 +73,11 @@ export function CheckoutPage() {
     setPayState({ kind: "submitting" });
 
     try {
-      const result = await payPaymentLink(token, { card, submittedAt }, idempotencyKey);
+      const payload = {
+        card: { ...card, pan: card.pan.replace(/\D/g, ""), cvv: card.cvv.replace(/\D/g, "") },
+        submittedAt,
+      };
+      const result = await payPaymentLink(token, payload, idempotencyKey);
       setPayState({ kind: "success", result });
     } catch (err) {
       if (err instanceof ApiError) {
@@ -89,91 +105,125 @@ export function CheckoutPage() {
   }
 
   if (loadState.kind === "loading") {
-    return (
-      <main className="checkout-page">
-        <p>Loading...</p>
-      </main>
+    return shell(
+      <>
+        <p className="checkout-kicker">FilsPay</p>
+        <div className="checkout-state">
+          <h1>Preparing checkout</h1>
+          <p>Fetching this payment link.</p>
+        </div>
+      </>,
     );
   }
 
   if (loadState.kind === "not_found") {
-    return (
-      <main className="checkout-page">
-        <h1>Payment link not found</h1>
-        <p>This payment link does not exist.</p>
-      </main>
+    return shell(
+      <>
+        <p className="checkout-kicker">FilsPay</p>
+        <div className="checkout-state">
+          <h1>Link not found</h1>
+          <p>This payment link does not exist. Ask the shop for a new one.</p>
+        </div>
+      </>,
     );
   }
 
   const { link } = loadState;
+  const amount = formatBhd(toFils(link.amountFils));
 
   if (payState.kind === "success") {
-    return (
-      <main className="checkout-page">
-        <h1>Payment successful</h1>
-        <p>Thank you — your payment has been received.</p>
-        <dl>
-          <dt>Transaction ID</dt>
+    return shell(
+      <>
+        <p className="checkout-kicker">FilsPay</p>
+        <h1>Payment received</h1>
+        <p className="checkout-shop">{link.merchantDisplayName}</p>
+        <p className="checkout-amount">
+          {amount} <span>BHD</span>
+        </p>
+        <dl className="checkout-receipt">
+          <dt>Transaction</dt>
           <dd>{payState.result.transactionId}</dd>
           <dt>Paid at</dt>
-          <dd>{payState.result.paidAt}</dd>
+          <dd>{new Date(payState.result.paidAt).toLocaleString()}</dd>
+          {link.reference ? (
+            <>
+              <dt>Reference</dt>
+              <dd>{link.reference}</dd>
+            </>
+          ) : null}
         </dl>
-      </main>
+      </>,
     );
   }
 
   if (payState.kind === "terminal") {
-    return (
-      <main className="checkout-page">
-        <h1>Unable to pay</h1>
-        <p>{payState.message}</p>
-      </main>
+    return shell(
+      <>
+        <p className="checkout-kicker">FilsPay</p>
+        <div className="checkout-state">
+          <h1>Unable to pay</h1>
+          <p>{payState.message}</p>
+        </div>
+      </>,
     );
   }
 
   if (link.status === "paid") {
-    return (
-      <main className="checkout-page">
-        <h1>Already paid</h1>
-        <p>This invoice has already been paid.</p>
-      </main>
+    return shell(
+      <>
+        <p className="checkout-kicker">FilsPay</p>
+        <div className="checkout-state">
+          <h1>Already paid</h1>
+          <p>This invoice has already been paid. No further charge will be taken.</p>
+        </div>
+      </>,
     );
   }
   if (link.status === "expired") {
-    return (
-      <main className="checkout-page">
-        <h1>Link expired</h1>
-        <p>This payment link has expired.</p>
-      </main>
+    return shell(
+      <>
+        <p className="checkout-kicker">FilsPay</p>
+        <div className="checkout-state">
+          <h1>Link expired</h1>
+          <p>Ask the shop for a new payment link.</p>
+        </div>
+      </>,
     );
   }
   if (link.status === "canceled") {
-    return (
-      <main className="checkout-page">
-        <h1>No longer available</h1>
-        <p>This payment link is no longer available.</p>
-      </main>
+    return shell(
+      <>
+        <p className="checkout-kicker">FilsPay</p>
+        <div className="checkout-state">
+          <h1>No longer available</h1>
+          <p>This payment link was canceled.</p>
+        </div>
+      </>,
     );
   }
   if (link.status === "processing") {
-    return (
-      <main className="checkout-page">
-        <h1>Payment processing</h1>
-        <p>A payment is being processed for this link — please wait a moment and refresh.</p>
-      </main>
+    return shell(
+      <>
+        <p className="checkout-kicker">FilsPay</p>
+        <div className="checkout-state">
+          <h1>Payment processing</h1>
+          <p>A payment is already in progress. Refresh in a moment.</p>
+        </div>
+      </>,
     );
   }
 
-  // link.status === 'active'
-  const amount = formatBhd(toFils(link.amountFils));
   const submitting = payState.kind === "submitting";
 
-  return (
-    <main className="checkout-page">
-      <h1>{link.merchantDisplayName}</h1>
-      <p className="checkout-amount">{amount} BHD</p>
+  return shell(
+    <>
+      <p className="checkout-kicker">FilsPay</p>
+      <p className="checkout-shop">{link.merchantDisplayName}</p>
+      <p className="checkout-amount">
+        {amount} <span>BHD</span>
+      </p>
       {link.description ? <p className="checkout-description">{link.description}</p> : null}
-      {link.reference ? <p className="checkout-reference">Reference: {link.reference}</p> : null}
+      {link.reference ? <p className="checkout-reference">Reference {link.reference}</p> : null}
 
       {payState.kind === "declined" ? <p className="checkout-error">{payState.message}</p> : null}
 
@@ -183,19 +233,14 @@ export function CheckoutPage() {
           <input
             type="text"
             inputMode="numeric"
+            autoComplete="cc-number"
             required
-            value={card.pan}
+            placeholder="ACCT-000015"
+            value={groupPan(card.pan)}
             onChange={(e) => {
-              const pan = e.target.value;
-              setCard({ ...card, pan });
-              const digits = pan.replace(/\D/g, "");
-              if (digits.length >= 4) {
-                void import("../../utils/helpers.js").then((m) => {
-                  setBrandHint(m.formatCardBrandHint(digits));
-                });
-              } else {
-                setBrandHint(null);
-              }
+              const digits = e.target.value.replace(/\D/g, "").slice(0, 19);
+              setCard({ ...card, pan: digits });
+              setBrandHint(digits.length >= 4 ? formatCardBrandHint(digits) : null);
             }}
           />
           {brandHint && brandHint !== "unknown" ? (
@@ -204,22 +249,26 @@ export function CheckoutPage() {
         </label>
         <div className="checkout-form-row">
           <label>
-            Expiry month
+            Month
             <input
               type="number"
               min={1}
               max={12}
               required
+              placeholder="12"
+              autoComplete="cc-exp-month"
               value={card.expiryMonth}
               onChange={(e) => setCard({ ...card, expiryMonth: Number(e.target.value) })}
             />
           </label>
           <label>
-            Expiry year
+            Year
             <input
               type="number"
               min={new Date().getFullYear()}
               required
+              placeholder="2030"
+              autoComplete="cc-exp-year"
               value={card.expiryYear}
               onChange={(e) => setCard({ ...card, expiryYear: Number(e.target.value) })}
             />
@@ -230,21 +279,26 @@ export function CheckoutPage() {
               type="text"
               inputMode="numeric"
               required
+              maxLength={4}
+              autoComplete="cc-csc"
+              placeholder="123"
               value={card.cvv}
-              onChange={(e) => setCard({ ...card, cvv: e.target.value })}
+              onChange={(e) => setCard({ ...card, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) })}
             />
           </label>
         </div>
         <button type="submit" disabled={submitting}>
-          {submitting ? "Processing..." : `Pay ${amount} BHD`}
+          {submitting ? "Processing…" : `Pay ${amount} BHD`}
         </button>
       </form>
 
-      <p className="checkout-help">
-        Test cards (simulated acquirer, no real charge): any other number approves; a PAN ending{" "}
-        <code>0002</code> always declines (do not honor); ending <code>0119</code> always declines
-        (insufficient funds); ending <code>0069</code> always errors.
-      </p>
-    </main>
+      <details className="checkout-help">
+        <summary>Test cards (no real charge)</summary>
+        <p>
+          Most numbers approve. Ending <code>0002</code> declines, <code>0119</code> is insufficient
+          funds, <code>0069</code> errors.
+        </p>
+      </details>
+    </>,
   );
 }

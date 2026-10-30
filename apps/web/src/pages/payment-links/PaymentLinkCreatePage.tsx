@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { parseBhdToFils } from "@filspay/money";
 import { createPaymentLink } from "../../api/paymentLinks.js";
 import { describeError } from "../../api/client.js";
 import { useDashboardAuth } from "../../auth/DashboardAuthContext.js";
@@ -24,7 +25,7 @@ export function PaymentLinkCreatePage() {
   const { me } = useDashboardAuth();
   const navigate = useNavigate();
 
-  const [amountFils, setAmountFils] = useState("");
+  const [amountBhd, setAmountBhd] = useState("");
   const [reference, setReference] = useState("");
   const [description, setDescription] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
@@ -37,9 +38,15 @@ export function PaymentLinkCreatePage() {
     if (!me) return;
     setError(null);
 
-    const amount = Number(amountFils);
-    if (!Number.isInteger(amount) || amount <= 0) {
-      setError("Amount must be a positive whole number of fils.");
+    let amount: number;
+    try {
+      amount = Number(parseBhdToFils(amountBhd));
+    } catch {
+      setError("Enter a BHD amount with up to 3 decimal places, for example 2.500.");
+      return;
+    }
+    if (amount <= 0) {
+      setError("Amount must be greater than zero.");
       return;
     }
     const expiresAtIso = localDateTimeToIso(expiresAt);
@@ -70,23 +77,28 @@ export function PaymentLinkCreatePage() {
 
   return (
     <section>
-      <h1>New payment link</h1>
+      <div className="dash-page-head">
+        <div>
+          <h1>New payment link</h1>
+          <p>The customer pays this amount on a public checkout page. No login.</p>
+        </div>
+      </div>
 
       {error ? <p className="dash-error">{error}</p> : null}
 
       <form className="dash-form" onSubmit={(e) => void handleSubmit(e)}>
         <label>
-          Amount in fils
+          Amount in BHD
           <input
-            type="number"
-            min={1}
-            step={1}
+            type="text"
+            inputMode="decimal"
             required
-            value={amountFils}
-            onChange={(e) => setAmountFils(e.target.value)}
+            placeholder="2.500"
+            value={amountBhd}
+            onChange={(e) => setAmountBhd(e.target.value)}
           />
         </label>
-        <p className="dash-muted dash-hint">1000 fils = 1.000 BHD.</p>
+        <p className="dash-muted dash-hint">Three decimal places. 2.500 BHD is 2,500 fils.</p>
         <label>
           Reference (optional)
           <input type="text" value={reference} onChange={(e) => setReference(e.target.value)} />
@@ -104,8 +116,8 @@ export function PaymentLinkCreatePage() {
             onChange={(e) => setExpiresAt(e.target.value)}
           />
         </label>
-        <button type="submit" className="dash-button" disabled={submitting}>
-          {submitting ? "Creating..." : "Create payment link"}
+        <button type="submit" className="dash-button dash-button-primary" disabled={submitting}>
+          {submitting ? "Creating…" : "Create payment link"}
         </button>
       </form>
 

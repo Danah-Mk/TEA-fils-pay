@@ -30,19 +30,16 @@ export function DashboardLayout() {
       <header className="dash-header">
         <div className="dash-brand">FilsPay</div>
         <nav className="dash-nav">
+          <NavLink to="/dashboard/overview">Overview</NavLink>
           <NavLink to="/dashboard/transactions">Transactions</NavLink>
           <NavLink to="/dashboard/payment-links">Payment links</NavLink>
-          {/* Every webhook route — including the plain list read — is
-              owner/finance-only server-side, so the link itself is
-              hidden from support rather than offered and then refused. */}
-          <RequireRole allow={["owner", "finance"]}>
-            <NavLink to="/dashboard/webhooks">Webhooks</NavLink>
-          </RequireRole>
           <NavLink to="/dashboard/settlement">Settlement</NavLink>
           <RequireRole allow={["owner", "finance"]}>
             <NavLink to="/dashboard/reconciliation">Reconciliation</NavLink>
           </RequireRole>
-          <NavLink to="/dashboard/overview">Overview</NavLink>
+          <RequireRole allow={["owner", "finance"]}>
+            <NavLink to="/dashboard/webhooks">Webhooks</NavLink>
+          </RequireRole>
         </nav>
         <div className="dash-identity">
           {me ? (

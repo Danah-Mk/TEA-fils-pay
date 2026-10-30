@@ -71,8 +71,9 @@ export function LoginPage() {
 
   return (
     <main className="admin-centered">
-      <h1>FilsPay Admin</h1>
-      <p className="admin-muted">Internal operations console.</p>
+      <p className="admin-kicker">FilsPay</p>
+      <h1>Operations console</h1>
+      <p className="admin-muted">Internal sign-in. Finance actions still need a second approver.</p>
 
       {error ? <p className="admin-error">{error}</p> : null}
 
@@ -120,8 +121,9 @@ export function LoginPage() {
               inputMode="numeric"
               autoComplete="one-time-code"
               required
+              maxLength={8}
               value={code}
-              onChange={(e) => setCode(e.target.value)}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
             />
           </label>
           <button type="submit" disabled={submitting}>

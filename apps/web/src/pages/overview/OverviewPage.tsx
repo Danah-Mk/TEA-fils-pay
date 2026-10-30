@@ -67,7 +67,12 @@ export function OverviewPage() {
 
   return (
     <section>
-      <h1>Overview</h1>
+      <div className="dash-page-head">
+        <div>
+          <h1>Overview</h1>
+          <p>Volume and payouts for this shop. Figures follow Asia/Bahrain dates.</p>
+        </div>
+      </div>
 
       <form
         className="dash-form dash-form-inline"
@@ -94,8 +99,8 @@ export function OverviewPage() {
             onChange={(e) => setTopLinksLimit(Number(e.target.value))}
           />
         </label>
-        <button type="submit" className="dash-button" disabled={loading}>
-          {loading ? "Refreshing..." : "Refresh"}
+        <button type="submit" className="dash-button dash-button-primary" disabled={loading}>
+          {loading ? "Refreshing…" : "Refresh"}
         </button>
       </form>
 
@@ -110,7 +115,7 @@ export function OverviewPage() {
           <tr>
             <th>Date</th>
             <th>Captured</th>
-            <th>Gross</th>
+            <th className="dash-num">Gross</th>
             <th>Voided</th>
             <th />
           </tr>
@@ -120,7 +125,7 @@ export function OverviewPage() {
             <tr key={point.date}>
               <td>{point.date}</td>
               <td>{formatCount(point.capturedCount)}</td>
-              <td>{bhd(point.capturedGrossFils)}</td>
+              <td className="dash-num">{bhd(point.capturedGrossFils)}</td>
               <td>{formatCount(point.voidedCount)}</td>
               <td className="dash-bar-cell">
                 {/* A plain CSS bar, scaled to the window's own peak — no
@@ -149,9 +154,9 @@ export function OverviewPage() {
           <tr>
             <th>Batch date</th>
             <th>Status</th>
-            <th>Gross</th>
-            <th>Fee</th>
-            <th>Net payout</th>
+            <th className="dash-num">Gross</th>
+            <th className="dash-num">Fee</th>
+            <th className="dash-num">Net payout</th>
             <th>Paid</th>
           </tr>
         </thead>
@@ -162,9 +167,9 @@ export function OverviewPage() {
                 <Link to={`/dashboard/settlement/${point.settlementBatchId}`}>{point.batchDate}</Link>
               </td>
               <td>{point.status}</td>
-              <td>{bhd(point.grossFils)}</td>
-              <td>{bhd(point.feeFils)}</td>
-              <td>{bhd(point.netPayoutFils)}</td>
+              <td className="dash-num">{bhd(point.grossFils)}</td>
+              <td className="dash-num">{bhd(point.feeFils)}</td>
+              <td className="dash-num">{bhd(point.netPayoutFils)}</td>
               <td>{dateTime(point.paidAt)}</td>
             </tr>
           ))}
@@ -188,7 +193,7 @@ export function OverviewPage() {
             <th>#</th>
             <th>Reference</th>
             <th>Description</th>
-            <th>Amount</th>
+            <th className="dash-num">Amount</th>
             <th>Paid at</th>
           </tr>
         </thead>
@@ -200,7 +205,7 @@ export function OverviewPage() {
                 <Link to={`/dashboard/payment-links/${link.id}`}>{dash(link.reference)}</Link>
               </td>
               <td>{dash(link.description)}</td>
-              <td>{bhd(link.amountFils)}</td>
+              <td className="dash-num">{bhd(link.amountFils)}</td>
               <td>{dateTime(link.paidAt)}</td>
             </tr>
           ))}

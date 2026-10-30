@@ -1,19 +1,45 @@
-/* No design system, no UI kit — the same "real but small" minimalism
-   apps/web's checkout page ships with. Just enough for dense operational
-   tables to be readable and for the impersonation banner to be impossible
-   to overlook. */
+:root {
+  --fp-bg: #f4f1ea;
+  --fp-surface: #fffefb;
+  --fp-ink: #1c1917;
+  --fp-muted: #57534e;
+  --fp-line: #e7e0d4;
+  --fp-brand: #0f3d3e;
+  --fp-accent: #1f7a6c;
+  --fp-sand: #c4a574;
+  --fp-danger: #9f1239;
+  --fp-danger-bg: #fff1f2;
+  --fp-ok: #166534;
+  --fp-ok-bg: #ecfdf3;
+  --fp-warn: #92400e;
+  --fp-warn-bg: #fff7ed;
+  --fp-radius: 10px;
+  --fp-shadow: 0 1px 2px rgba(28, 25, 23, 0.06), 0 10px 28px rgba(15, 61, 62, 0.07);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
   font-size: 15px;
-  color: #1a1a1a;
-  background: #fafafa;
+  line-height: 1.45;
+  color: var(--fp-ink);
+  background: var(--fp-bg);
 }
 
 code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.9em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--fp-accent);
+  outline-offset: 2px;
 }
 
 .admin-shell {
@@ -24,29 +50,39 @@ code {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 1.5rem;
-  padding: 0.75rem 1.5rem;
-  background: #fff;
-  border-bottom: 1px solid #ddd;
+  gap: 1rem 1.5rem;
+  padding: 0.85rem 1.5rem;
+  background: var(--fp-brand);
+  color: #f4f1ea;
 }
 
 .admin-brand {
   font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .admin-nav {
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.25rem;
 }
 
 .admin-nav a {
-  color: #1a1a1a;
+  color: #d6ebe6;
   text-decoration: none;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+}
+
+.admin-nav a:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
 }
 
 .admin-nav a.active {
-  font-weight: 700;
-  text-decoration: underline;
+  background: #fffefb;
+  color: var(--fp-brand);
+  font-weight: 600;
 }
 
 .admin-identity {
@@ -54,31 +90,51 @@ code {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  font-size: 0.9em;
 }
 
 .admin-role-chip {
-  padding: 0.1rem 0.4rem;
-  border: 1px solid #999;
-  border-radius: 3px;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid rgba(244, 241, 234, 0.35);
+  border-radius: 999px;
   font-size: 0.8em;
 }
 
 .admin-main {
   max-width: 70rem;
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: 1.75rem 1.5rem 3rem;
+}
+
+.admin-main h1 {
+  margin: 0 0 0.4rem;
+  font-size: 1.55rem;
+  letter-spacing: -0.02em;
 }
 
 .admin-centered {
   max-width: 26rem;
-  margin: 4rem auto;
-  padding: 1.5rem;
+  margin: 4.5rem auto;
+  padding: 1.75rem 1.6rem 1.85rem;
+  background: var(--fp-surface);
+  border: 1px solid var(--fp-line);
+  border-radius: 16px;
+  box-shadow: var(--fp-shadow);
+}
+
+.admin-kicker {
+  margin: 0 0 0.7rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fp-accent);
+  font-weight: 700;
 }
 
 .admin-form {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.85rem;
   margin: 1rem 0;
   max-width: 40rem;
 }
@@ -91,72 +147,115 @@ code {
 .admin-form label {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.3rem;
+  font-size: 0.88rem;
+  color: var(--fp-muted);
 }
 
 .admin-form input,
 .admin-form select,
 .admin-form textarea {
-  padding: 0.4rem;
+  padding: 0.55rem 0.7rem;
   font: inherit;
-  border: 1px solid #bbb;
-  border-radius: 3px;
+  border: 1px solid var(--fp-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--fp-ink);
 }
 
-/* MK: global button style, temporary until the design system (Nov 2025) */
 button {
-  padding: 0.4rem 0.8rem;
+  min-height: 2.35rem;
+  padding: 0.45rem 0.9rem;
   font: inherit;
+  font-weight: 600;
   cursor: pointer;
-  border: 1px solid #888;
-  border-radius: 3px;
+  border: 1px solid var(--fp-line);
+  border-radius: 8px;
   background: #fff;
+  color: var(--fp-ink);
+}
+
+button:hover {
+  border-color: var(--fp-sand);
+}
+
+button[type="submit"] {
+  background: var(--fp-brand);
+  border-color: var(--fp-brand);
+  color: #f4f1ea;
 }
 
 button:disabled {
   cursor: default;
-  opacity: 0.6;
+  opacity: 0.55;
+}
+
+.admin-header button {
+  background: transparent;
+  border-color: rgba(244, 241, 234, 0.4);
+  color: #f4f1ea;
 }
 
 .admin-filters {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-  border: 1px solid #ddd;
-  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--fp-line);
+  background: var(--fp-surface);
+  padding: 0.75rem 1rem;
   margin: 1rem 0;
+  border-radius: var(--fp-radius);
 }
 
 .admin-filters label {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.35rem;
 }
 
 .admin-table {
   width: 100%;
   border-collapse: collapse;
   margin: 1rem 0;
-  background: #fff;
+  background: var(--fp-surface);
+  border: 1px solid var(--fp-line);
+  border-radius: var(--fp-radius);
+  overflow: hidden;
 }
 
 .admin-table th,
 .admin-table td {
-  border: 1px solid #e0e0e0;
-  padding: 0.4rem 0.6rem;
+  border: 0;
+  border-bottom: 1px solid var(--fp-line);
+  padding: 0.7rem 0.85rem;
   text-align: left;
   vertical-align: top;
+}
+
+.admin-table th {
+  font-size: 0.78rem;
+  color: var(--fp-muted);
+  background: #f8f4ec;
+}
+
+.admin-table tbody tr:last-child td {
+  border-bottom: 0;
 }
 
 .admin-dl {
   display: grid;
   grid-template-columns: 12rem 1fr;
-  gap: 0.25rem 1rem;
+  gap: 0.45rem 1rem;
   margin: 1rem 0;
+  padding: 1rem 1.15rem;
+  background: var(--fp-surface);
+  border: 1px solid var(--fp-line);
+  border-radius: var(--fp-radius);
 }
 
 .admin-dl dt {
   font-weight: 600;
+  color: var(--fp-muted);
 }
 
 .admin-dl dd {
@@ -164,29 +263,34 @@ button:disabled {
 }
 
 .admin-muted {
-  color: #666;
+  color: var(--fp-muted);
 }
 
 .admin-error {
-  padding: 0.6rem 0.8rem;
-  border: 1px solid #b00020;
-  background: #fdeaea;
-  color: #7a0016;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid #fecdd3;
+  background: var(--fp-danger-bg);
+  color: var(--fp-danger);
+  border-radius: 8px;
 }
 
 .admin-notice {
-  padding: 0.6rem 0.8rem;
-  border: 1px solid #2a6f2a;
-  background: #eef7ee;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid #bbf7d0;
+  background: var(--fp-ok-bg);
+  color: var(--fp-ok);
   margin: 1rem 0;
+  border-radius: 8px;
 }
 
 .admin-confirm {
-  padding: 0.8rem;
-  border: 2px solid #b06000;
-  background: #fff6e8;
+  padding: 1rem 1.1rem;
+  border: 1px solid #fde68a;
+  background: var(--fp-warn-bg);
+  color: var(--fp-warn);
   margin: 1rem 0;
   max-width: 40rem;
+  border-radius: var(--fp-radius);
 }
 
 .admin-id-list {
@@ -194,16 +298,14 @@ button:disabled {
   overflow-y: auto;
 }
 
-/* Deliberately loud: an active impersonation grant must never be something
-   an operator can fail to notice. */
 .impersonation-banner {
   display: flex;
   align-items: center;
   gap: 1rem;
   padding: 0.75rem 1.5rem;
-  background: #7a0016;
+  background: #9f1239;
   color: #fff;
-  border-bottom: 4px solid #ffcc00;
+  border-bottom: 4px solid #c4a574;
   position: sticky;
   top: 0;
   z-index: 10;
@@ -216,7 +318,7 @@ button:disabled {
 .impersonation-banner button {
   margin-left: auto;
   background: #fff;
-  color: #7a0016;
+  color: #9f1239;
   font-weight: 700;
   border-color: #fff;
   white-space: nowrap;
@@ -225,4 +327,17 @@ button:disabled {
 .impersonation-banner-error {
   margin-top: 0.4rem;
   font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .admin-header {
+    padding: 0.75rem 1rem;
+  }
+  .admin-main {
+    padding: 1.25rem 1rem 2.5rem;
+  }
+  .admin-identity {
+    width: 100%;
+    margin-left: 0;
+  }
 }

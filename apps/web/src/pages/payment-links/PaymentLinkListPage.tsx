@@ -64,15 +64,17 @@ export function PaymentLinkListPage() {
 
   return (
     <section>
-      <h1>Payment links</h1>
-
-      <RequireRole allow={["owner", "finance"]}>
-        <p>
-          <Link className="dash-button-link" to="/dashboard/payment-links/new">
+      <div className="dash-page-head">
+        <div>
+          <h1>Payment links</h1>
+          <p>Invoices a customer can pay without logging in.</p>
+        </div>
+        <RequireRole allow={["owner", "finance"]}>
+          <Link className="dash-button-link dash-button-primary" to="/dashboard/payment-links/new">
             New payment link
           </Link>
-        </p>
-      </RequireRole>
+        </RequireRole>
+      </div>
 
       <fieldset className="dash-filters">
         <legend>Status</legend>
@@ -90,43 +92,47 @@ export function PaymentLinkListPage() {
 
       {error ? <p className="dash-error">{error}</p> : null}
 
-      <table className="dash-table">
-        <thead>
-          <tr>
-            <th>Reference</th>
-            <th>Description</th>
-            <th>Amount</th>
-            <th>Status</th>
-            <th>Expires</th>
-            <th>Paid</th>
-            <th>Canceled</th>
-          </tr>
-        </thead>
-        <tbody>
-          {links.map((link) => (
-            <tr key={link.id}>
-              <td>
-                <Link to={`/dashboard/payment-links/${link.id}`}>{dash(link.reference)}</Link>
-              </td>
-              <td>{dash(link.description)}</td>
-              <td>{bhd(link.amountFils)}</td>
-              <td>
-                <span className={`dash-status dash-status-${link.status}`}>{link.status}</span>
-              </td>
-              <td>{dateTime(link.expiresAt)}</td>
-              <td>{dateTime(link.paidAt)}</td>
-              <td>{dateTime(link.canceledAt)}</td>
-            </tr>
-          ))}
-          {links.length === 0 && !loading ? (
-            <tr>
-              <td colSpan={7}>No payment links match these filters.</td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
+      {links.length === 0 && !loading ? (
+        <div className="dash-empty">
+          <p>No payment links match these filters.</p>
+          <p>Create a link to send a customer a pay page.</p>
+        </div>
+      ) : (
+        <div className="dash-table-wrap">
+          <table className="dash-table">
+            <thead>
+              <tr>
+                <th>Reference</th>
+                <th>Description</th>
+                <th className="dash-num">Amount</th>
+                <th>Status</th>
+                <th>Expires</th>
+                <th>Paid</th>
+                <th>Canceled</th>
+              </tr>
+            </thead>
+            <tbody>
+              {links.map((link) => (
+                <tr key={link.id}>
+                  <td>
+                    <Link to={`/dashboard/payment-links/${link.id}`}>{dash(link.reference)}</Link>
+                  </td>
+                  <td>{dash(link.description)}</td>
+                  <td className="dash-num">{bhd(link.amountFils)}</td>
+                  <td>
+                    <span className={`dash-status dash-status-${link.status}`}>{link.status}</span>
+                  </td>
+                  <td>{dateTime(link.expiresAt)}</td>
+                  <td>{dateTime(link.paidAt)}</td>
+                  <td>{dateTime(link.canceledAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-      {loading ? <p>Loading...</p> : null}
+      {loading ? <p className="dash-muted">Loading…</p> : null}
 
       <Pagination nextCursor={nextCursor} loading={loading} onLoadMore={() => void load(nextCursor)} />
     </section>

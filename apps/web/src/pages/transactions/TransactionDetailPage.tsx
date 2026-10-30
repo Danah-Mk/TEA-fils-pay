@@ -6,6 +6,7 @@ import {
   getTransactionEvents,
   voidTransaction,
 } from "../../api/transactions.js";
+import { parseBhdToFils } from "@filspay/money";
 import { ApiError, describeError } from "../../api/client.js";
 import { RequireRole } from "../../auth/RequireRole.js";
 import { bhd, dash, dateTime } from "../../format.js";
@@ -71,7 +72,7 @@ export function TransactionDetailPage() {
       // Left blank, `amountFils` is omitted entirely and capture.ts captures
       // everything still outstanding — its own documented default. Computing
       // the remainder here would just be a second, staler copy of that rule.
-      const input = trimmed === "" ? {} : { amountFils: Number(trimmed) };
+      const input = trimmed === "" ? {} : { amountFils: Number(parseBhdToFils(trimmed)) };
       // A fresh Idempotency-Key per click, including a retry after a decline —
       // same discipline as the checkout page's submit handler.
       await captureTransaction(id, input, newIdempotencyKey());
@@ -81,7 +82,11 @@ export function TransactionDetailPage() {
       // row server-side, so the timeline is stale, not merely shorter.
       await load();
     } catch (err) {
-      setActionError(describeError(err));
+      if (err instanceof RangeError) {
+        setActionError("Enter a BHD amount with up to 3 decimal places, for example 2.500.");
+      } else {
+        setActionError(describeError(err));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -137,10 +142,14 @@ export function TransactionDetailPage() {
 
   return (
     <section>
-      <h1>Transaction</h1>
-      <p className="dash-muted">
-        <code>{txn.id}</code>
-      </p>
+      <div className="dash-page-head">
+        <div>
+          <h1>Transaction</h1>
+          <p className="dash-muted">
+            <code>{txn.id}</code>
+          </p>
+        </div>
+      </div>
 
       <dl className="dash-dl">
         <dt>Status</dt>
@@ -182,17 +191,17 @@ export function TransactionDetailPage() {
               captureOpen ? (
                 <form className="dash-form dash-form-inline" onSubmit={(e) => void handleCapture(e)}>
                   <label>
-                    Amount in fils (blank captures everything outstanding)
+                    Amount in BHD (blank captures everything outstanding)
                     <input
-                      type="number"
-                      min={1}
-                      step={1}
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="2.500"
                       value={captureAmount}
                       onChange={(e) => setCaptureAmount(e.target.value)}
                     />
                   </label>
-                  <button type="submit" className="dash-button" disabled={submitting}>
-                    {submitting ? "Capturing..." : "Capture"}
+                  <button type="submit" className="dash-button dash-button-primary" disabled={submitting}>
+                    {submitting ? "Capturing…" : "Capture"}
                   </button>
                   <button
                     type="button"

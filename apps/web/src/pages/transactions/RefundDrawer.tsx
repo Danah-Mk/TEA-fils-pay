@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { parseBhdToFils } from "@filspay/money";
 import { request } from "../../api/client.js";
 import { describeError } from "../../api/client.js";
 import { newIdempotencyKey } from "../../utils/helpers.js";
@@ -57,10 +58,14 @@ export function RefundDrawer({ txn, onRefunded }: RefundDrawerProps) {
     setError(null);
     try {
       const trimmed = amount.trim();
-      // Left blank, amountFils is omitted entirely and the API refunds
-      // everything still refundable — its own documented default, same
-      // affordance the capture form has.
-      const body = trimmed === "" ? { transactionId: txn.id } : { transactionId: txn.id, amountFils: Number(trimmed) };
+      // Blank = full remaining refund. A filled field is BHD text, parsed
+      // with parseBhdToFils (3 decimals, never parseFloat).
+      let body: { transactionId: string; amountFils?: number };
+      if (trimmed === "") {
+        body = { transactionId: txn.id };
+      } else {
+        body = { transactionId: txn.id, amountFils: Number(parseBhdToFils(trimmed)) };
+      }
       attemptKey.current ??= newIdempotencyKey();
 
       await request<RefundResponse>("/v1/refunds", {
@@ -76,7 +81,11 @@ export function RefundDrawer({ txn, onRefunded }: RefundDrawerProps) {
       // row server-side, so the timeline is stale, not merely shorter.
       await onRefunded();
     } catch (err) {
-      setError(describeError(err));
+      if (err instanceof RangeError) {
+        setError("Enter a BHD amount with up to 3 decimal places, for example 1.000.");
+      } else {
+        setError(describeError(err));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -89,31 +98,35 @@ export function RefundDrawer({ txn, onRefunded }: RefundDrawerProps) {
       <div className="dash-actions">
         {error ? <p className="dash-error">{error}</p> : null}
         {open ? (
-          <form className="dash-form dash-form-inline" onSubmit={(e) => void handleRefund(e)}>
+          <form className="dash-form" onSubmit={(e) => void handleRefund(e)}>
+            <p className="dash-confirm">
+              This sends money back to the cardholder. It cannot be recalled. Still refundable:{" "}
+              <strong>{bhd(refundableFils)}</strong>
+            </p>
             <label>
-              Amount in fils (blank refunds everything still refundable)
+              Amount in BHD (blank refunds everything still refundable)
               <input
-                type="number"
-                min={1}
-                step={1}
-                max={refundableFils}
+                type="text"
+                inputMode="decimal"
+                placeholder="1.000"
                 value={amount}
                 onChange={(e) => {
                   setAmount(e.target.value);
-                  attemptKey.current = null; // a different request needs a different key
+                  attemptKey.current = null;
                 }}
               />
             </label>
-            <p className="dash-muted">Still refundable: {bhd(refundableFils)}</p>
-            <button type="submit" className="dash-button" disabled={submitting}>
-              {submitting ? "Refunding..." : "Refund"}
-            </button>
-            <button type="button" className="dash-button" disabled={submitting} onClick={() => setOpen(false)}>
-              Cancel
-            </button>
+            <div className="dash-actions">
+              <button type="submit" className="dash-button dash-button-danger" disabled={submitting}>
+                {submitting ? "Refunding…" : "Confirm refund"}
+              </button>
+              <button type="button" className="dash-button" disabled={submitting} onClick={() => setOpen(false)}>
+                Cancel
+              </button>
+            </div>
           </form>
         ) : (
-          <button type="button" className="dash-button" onClick={() => setOpen(true)}>
+          <button type="button" className="dash-button dash-button-danger" onClick={() => setOpen(true)}>
             Refund
           </button>
         )}

@@ -43,7 +43,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const redirectTo = (location.state as { from?: string } | null)?.from ?? "/dashboard/transactions";
+  const redirectTo = (location.state as { from?: string } | null)?.from ?? "/dashboard/overview";
 
   if (status === "authenticated") {
     return <Navigate to={redirectTo} replace />;
@@ -125,8 +125,10 @@ export function LoginPage() {
 
   return (
     <main className="dash-centered">
-      <h1>FilsPay dashboard</h1>
-      <p className="dash-muted">Merchant sign-in.</p>
+      <p className="dash-kicker">FilsPay</p>
+      <h1>Merchant dashboard</h1>
+      <p className="dash-muted">Sign in with your shop account.</p>
+      <p className="dash-step">{step.kind === "credentials" ? "Step 1 of 2 — password" : "Step 2 of 2 — one-time code"}</p>
 
       {error ? <p className="dash-error">{error}</p> : null}
       {notice ? <p className="dash-notice">{notice}</p> : null}
@@ -140,14 +142,13 @@ export function LoginPage() {
               required
               autoComplete="off"
               spellCheck={false}
-              placeholder="00000000-0000-0000-0000-000000000000"
+              placeholder="11111111-1111-4111-a111-111111111111"
               value={merchantId}
               onChange={(e) => setMerchantId(e.target.value)}
             />
           </label>
           <p className="dash-muted dash-hint">
-            The UUID issued when your account was created. Your API integration
-            already uses this value.
+            The UUID from onboarding. It is remembered on this browser after a successful sign-in.
           </p>
           <label>
             Email
@@ -169,18 +170,18 @@ export function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </label>
-          <button type="submit" className="dash-button" disabled={submitting}>
-            {submitting ? "Signing in..." : "Continue"}
+          <button type="submit" className="dash-button dash-button-primary" disabled={submitting}>
+            {submitting ? "Signing in…" : "Continue"}
           </button>
         </form>
       ) : (
-        <form onSubmit={(e) => void handleOtp(e)} className="dash-form">
+        <form onSubmit={(e) => void handleOtp(e)} className="dash-form dash-otp">
           <p>
             A one-time code was issued for <strong>{email}</strong>. It expires at{" "}
             {new Date(step.challenge.otpExpiresAt).toLocaleTimeString()}.
           </p>
           {step.challenge.devOtpCode ? (
-            <p className="dash-muted">
+            <p className="dash-notice">
               Development code: <code>{step.challenge.devOtpCode}</code>
             </p>
           ) : null}
@@ -191,12 +192,13 @@ export function LoginPage() {
               inputMode="numeric"
               autoComplete="one-time-code"
               required
+              maxLength={8}
               value={code}
-              onChange={(e) => setCode(e.target.value)}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
             />
           </label>
-          <button type="submit" className="dash-button" disabled={submitting}>
-            {submitting ? "Verifying..." : "Verify"}
+          <button type="submit" className="dash-button dash-button-primary" disabled={submitting}>
+            {submitting ? "Verifying…" : "Verify"}
           </button>
           <button
             type="button"
