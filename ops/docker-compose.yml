@@ -54,7 +54,9 @@ services:
   # One-off: deterministic seed data. DESTRUCTIVE — truncates merchants,
   # users and ledger tables of whatever DATABASE_URL it is given.
   # Do not run against a shared or production database.
+  # Profile-gated so `docker compose up -d` never starts it by accident.
   seed:
+    profiles: ["seed"]
     build:
       context: ..
       dockerfile: ops/Dockerfile.node
