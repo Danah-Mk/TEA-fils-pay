@@ -4,8 +4,8 @@
 
 **What it breaks:** Guessable OTPs and references.
 
-**The fix:** crypto.randomInt.
+**The fix:** crypto.randomInt / randomFromAlphabet. Admin invite codes use the same helper (no Math.random).
 
-**How to check:** Quick unit check (done).
+**How to check:** Quick unit check (done). inviteCode.test.ts.
 
-**Files:** apps/api/src/lib/random.ts
+**Files:** apps/api/src/lib/random.ts, apps/api/src/admin/inviteCode.ts

@@ -4,8 +4,8 @@
 
 **What it breaks:** The same payout instructed several times.
 
-**The fix:** Insert only if the batch has none. Structural fix still open: write it inside PayoutBatch's transaction.
+**The fix:** Insert only if the batch has none. PayoutBatch now writes the row in the same transaction as the ledger legs. The webhook path is a backfill for batches paid before that change.
 
-**How to check:** Two endpoints subscribed: one disbursement row.
+**How to check:** Two endpoints subscribed: one disbursement row. Paying a batch inserts settlement_payout_disbursements even with no webhook delivery.
 
-**Files:** apps/api/src/webhooks/payoutDisbursement.ts
+**Files:** apps/settlement/internal/settlement/batch.go, apps/api/src/webhooks/payoutDisbursement.ts
